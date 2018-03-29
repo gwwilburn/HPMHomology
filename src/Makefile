@@ -14,10 +14,13 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: ScoreSequenceHPM
+all: ScoreSequenceHPM hpm
 
 ScoreSequenceHPM: ScoreSequenceHPM.c
 	${CC} ${CFLAGS} -o ScoreSequenceHPM ${IFLAGS} ${LFLAGS} ${LIBS} ScoreSequenceHPM.c
+
+hpm: hpm.c
+	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
 
 clean:
 	rm -f ScoreSequenceHPM
