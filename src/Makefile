@@ -4,8 +4,8 @@ HMMERDIR = ../lib/hmmer/src
 
 #variables that I will run
 INCLUDES = -I${HMMERDIR} -I${ESLDIR}
-IFLAGS   = -I${ESLDIR} -I${HMMERDIR}
-LFLAGS   = -L${ESLDIR} -L${HMMERDIR}
+IFLAGS   = -I${ESLDIR} -I${HMMERDIR} -I../src
+LFLAGS   = -L${ESLDIR} -L${HMMERDIR} -L../src
 LIBS     = -leasel     -lm -lhmmer
 
 #compiler information
@@ -14,15 +14,20 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: ScoreSequenceHPM hpm
+all: hpm hpmfile hpmscore
 
-ScoreSequenceHPM: ScoreSequenceHPM.c
-	${CC} ${CFLAGS} -o ScoreSequenceHPM ${IFLAGS} ${LFLAGS} ${LIBS} ScoreSequenceHPM.c
+hpmscore: hpmscore.c
+	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.c hpmfile.c
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
 
+hpmfile: hpmfile.c
+	${CC} ${CFLAGS} -c -o hpmfile.o ${IFLAGS} hpmfile.c
+
+
+
 clean:
-	rm -f ScoreSequenceHPM
+	rm -f hpmscore hpm.o hpmfile.o
 
 .PHONY: all clean
