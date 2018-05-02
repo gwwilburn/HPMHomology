@@ -22,4 +22,6 @@ typedef struct hmmfile {
 
 /* hpmfile.c */
 extern int hpmfile_Write(FILE *f, HPM *hpm);
+HPM *hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuff);
+HPM *hpmfile_ReadDummy(char *f, ESL_ALPHABET *abc, char *errbuff);
 #endif

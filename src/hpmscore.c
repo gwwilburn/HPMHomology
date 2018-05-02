@@ -7,6 +7,7 @@
 #include "esl_msa.h"
 #include "esl_msafile.h"
 #include "esl_getopts.h"
+#include "esl_composition.h"
 
 #include "p7_config.h"
 #include "hmmer.h"
@@ -107,13 +108,13 @@ int main(int argc, char *argv[])
 
 
 	/* fill in e_ij's */
-	for (a = 0; a < cfg.abc->K; a++) {
-		for (i = 0; i < M; i++) {
-			cfg.hpm->h[i][a] = (0.1 * i)  + (0.0001 * a);
-			for (b = 0; b < cfg.abc->K; b++) {
-				for (j = 0; j < i; j++) {
-					cfg.hpm->e[i][j][IDX(a,b,cfg.hpm->abc->K+1)] = (0.1 * i) + (0.01*j) + (0.0001 * a) + (0.000001 * b);
-					cfg.hpm->e[j][i][IDX(b,a,cfg.hpm->abc->K+1)] = (0.1 * i) + (0.01*j) + (0.0001 * a) + (0.000001 * b);
+	for (a = 0; a < cfg.abc->K+1; a++) {
+		for (i = 1; i < M+1; i++) {
+			cfg.hpm->h[i][a] = (0.1 * (i-1))  + (0.0001 * a);
+			for (b = 0; b < cfg.abc->K+1; b++) {
+				for (j = 1; j < i; j++) {
+					cfg.hpm->e[i][j][IDX(a,b,cfg.hpm->abc->K+1)] = (0.1 * (i-1)) + (0.01*(j-1)) + (0.0001 * a) + (0.000001 * b);
+					cfg.hpm->e[j][i][IDX(b,a,cfg.hpm->abc->K+1)] = (0.1 * (i-1)) + (0.01*(j-1)) + (0.0001 * a) + (0.000001 * b);
 				}
 			}
 
@@ -134,11 +135,27 @@ int main(int argc, char *argv[])
 
 	}
 
-
 	char *hpm_outfile = "test.hpm";
 	FILE *hpm_outfp 	= 	NULL;
 	if ((hpm_outfp = fopen(hpm_outfile, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpm_outfile);
 	hpmfile_Write(hpm_outfp, cfg.hpm);
+	fclose(hpm_outfp);
+	HPM *hpmr = NULL;
+	hpmr = hpmfile_Read("test.hpm", cfg.abc, errbuf);
+
+	char *hpm_outfile2 = "test2.hpm";
+	FILE *hpm_outfp2   = NULL;
+	if ((hpm_outfp2 = fopen(hpm_outfile2, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpm_outfile2);
+	hpmfile_Write(hpm_outfp2, hpmr);
+	fclose(hpm_outfp2);
+
+	/* check if file is being read, print line numbers */
+
+	/*
+	HPM *hpmDummy = NULL;
+	hpmDummy = hpmfile_ReadDummy("test.hpm", cfg.abc, errbuf);
+	*/
+
 	fprintf(stdout, "hello world!\n");
 
 	/* clean up */
@@ -148,7 +165,6 @@ int main(int argc, char *argv[])
 	p7_hmm_Destroy(cfg.hmm);
 	p7_hmmfile_Close(cfg.hfp);
 	esl_getopts_Destroy(go);
-	fclose(hpm_outfp);
 
 	return 0;
 }
