@@ -5,6 +5,8 @@
 #include "easel.h"
 #include "esl_alphabet.h"
 #include "esl_msa.h"
+#include "esl_sq.h"
+#include "esl_sqio.h"
 #include "esl_msafile.h"
 #include "esl_getopts.h"
 #include "esl_composition.h"
@@ -19,6 +21,8 @@ struct cfg_s { /* shared configuration in master and workers */
 	ESL_ALPHABET	 *abc;
 	ESL_MSAFILE   	 *afp;     	/* input ali file						*/
 	ESL_MSA			 *msa;     	/* input msa							*/
+	ESL_SQFILE		 *sqfp;     /* input sequence file           */
+	ESL_SQ			 *sq;       /* sequence object					*/
 	P7_HMMFILE		 *hfp;		/* input hmm file						*/
 	P7_HMM			 *hmm;		/* input hmm							*/
 	HPM				 *hpm;		/* hidden potts model				*/
@@ -31,12 +35,12 @@ static ESL_OPTIONS options[] = {
 	{ "-h",         eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL, NULL,            "help; show brief info on version and usage",              1 },
 
 	/* Options forcing which alphabet we're working in (normally autodetected) */
-	{ "--amino",  eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--dna,--rna",    "<msafile> contains protein alignments",                   2 },
-	{ "--dna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--rna",  "<msafile> contains DNA alignments",                       2 },
-	{ "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<msafile> contains RNA alignments",                       2 },
+	{ "--amino",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                    2 },
+	{ "--dna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--rna",  "<seqfile> contains DNA sequences",                        2 },
+	{ "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<seqfile> contains RNA sequences",                        2 },
 	{ 0,0,0,0,0,0,0,0,0,0 },
 };
-static char usage[]  = "[-options] <msafile>";
+static char usage[]  = "[-options] <seqfile>";
 
 static void
 cmdline_failure(char *argv0, char *format, ...)
@@ -50,41 +54,85 @@ cmdline_failure(char *argv0, char *format, ...)
 	exit(1);
 }
 
+int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa) {
+	int z;    /* index for trace elements */
+	int n;    /* position index          */
+
+	/* loop over sequences */
+	for (n=0; n < msa->nseq; n++) {
+		/* print out sequence info */
+		fprintf(stdout, "%d: %d %d %d %s\n", z, tr[n]->L, tr[n]->M, tr[n]->N, msa->sqname[n]);
+		/* loop over trace positions for this seq */
+		for (z = 0; z < tr[n]->N; z++) {
+			/* check if we are in a match or delete state */
+			if (tr[n]->st[z] == 2 || tr[n]->st[z] == 6 ) {
+			//if (tr[n]->st[z] == P7T_M || tr[n]->st[z] == p7T_D ) {
+				/* print out trace position, alignment column, and sequence residue in this col */
+				fprintf(stdout, "\t %d: %d, %d\n", z, tr[n]->i[z], msa->ax[n][tr[n]->i[z]]);
+			}
+		}
+	}
+
+
+	return eslOK;
+}
 
 int main(int argc, char *argv[])
 {
-	ESL_GETOPTS     *go;											/* cmd line configuration 			*/
-	struct cfg_s    cfg;  										/* application configuration 		*/
-	char            *alifile 					= NULL;		/* alignment file path 				*/
-	char				 *hmmfile 					= NULL;		/* hmm file path						*/
-	int				 status;										/* easel return code 				*/
+	ESL_GETOPTS    *go;															/* cmd line configuration 			*/
+	struct cfg_s    cfg;  														/* application configuration 		*/
+	char           *seqfile 					= NULL;						/* sequence file path		 		*/
+	char           *alifile 					= NULL;						/* alignment file path		 		*/
+	int             infmt               	= eslSQFILE_UNKNOWN;
+	int				 alphatype    				= eslUNKNOWN;         	/*	for guessing alphabet			*/
+	char				*hmmfile 					= NULL;						/* hmm file path						*/
+	int				 status;														/* easel return code 				*/
 	char            errbuf[eslERRBUFSIZE];
 
 	/* parse command line */
 	go = esl_getopts_Create(options);
 	if (esl_opt_ProcessCmdline(go, argc, argv) != eslOK) cmdline_failure(argv[0], "Failed to parse command line: %s\n", go->errbuf);
 	if (esl_opt_VerifyConfig(go) 					 != eslOK) cmdline_failure(argv[0], "Error in app configuration:   %s\n", go->errbuf);
-	if (esl_opt_ArgNumber(go)						 != 2) 	  cmdline_failure(argv[0], "Incorrect number of command line arguments.\n", go->errbuf);
+	//if (esl_opt_ArgNumber(go)						 != 2) 	  cmdline_failure(argv[0], "Incorrect number of command line arguments.\n", go->errbuf);
+	if (esl_opt_ArgNumber(go)						 != 3) 	  cmdline_failure(argv[0], "Incorrect number of command line arguments.\n", go->errbuf);
 
-	alifile  = esl_opt_GetArg(go, 1);
-	hmmfile  = esl_opt_GetArg(go, 2);
+	hmmfile  = esl_opt_GetArg(go, 1);
+	seqfile  = esl_opt_GetArg(go, 2);
+	alifile  = esl_opt_GetArg(go, 3);
 
 	/* Set up the configuration structure shared amongst functions here */
-	cfg.abc = NULL; /* until we read the msa file below */
+	cfg.abc = NULL; /* until we read the seq file below */
 
-	/* Open the MSA file, digital mode; determine alphabet */
+	/* open the sequence file */
+	status = esl_sqfile_Open(seqfile, infmt, NULL, &cfg.sqfp);
+
+	/* Determine alphabet */
 	if 		(esl_opt_GetBoolean(go, "--amino"))		cfg.abc = esl_alphabet_Create(eslAMINO);
 	else if  (esl_opt_GetBoolean(go, "--dna"))		cfg.abc = esl_alphabet_Create(eslDNA);
 	else if  (esl_opt_GetBoolean(go, "--rna"))		cfg.abc = esl_alphabet_Create(eslRNA);
-
-	status = esl_msafile_Open(&(cfg.abc), alifile, NULL, eslMSAFILE_UNKNOWN, NULL, &cfg.afp);
-	if (status != eslOK) esl_msafile_OpenFailure(cfg.afp, status);
+	else {
+		status = esl_sqfile_GuessAlphabet(cfg.sqfp, &alphatype);
+		cfg.abc = esl_alphabet_Create(alphatype);
+	}
 
 	esl_alphabet_SetEquiv(cfg.abc, '.', '-'); /* allow '.' as gap char too */
 
-	/* Read in the MSA */
-	status = esl_msafile_Read(cfg.afp, &cfg.msa);
-	if (status != eslOK) esl_msafile_ReadFailure(cfg.afp, status);
+	/* prepare to read in sequences */
+	cfg.sq  = esl_sq_CreateDigital(cfg.abc);
+	esl_sqfile_SetDigital(cfg.sqfp, cfg.abc);
+
+	/* loop through seqs in file */
+
+	while ((status = esl_sqio_Read(cfg.sqfp, cfg.sq)) == eslOK) {
+		//esl_sqio_Write(stdout, cfg.sq, eslSQFILE_FASTA, /*update=*/FALSE);
+		esl_sq_Reuse(cfg.sq);
+
+	}
+
+	/* common error handling */
+	if      (status == eslEFORMAT) esl_fatal("Parse failed\n  %s", esl_sqfile_GetErrorBuf(cfg.sqfp));
+	else if (status != eslEOF)     esl_fatal("Unexpected error %d in reading", status);
+
 
 	/* Open the .hmm file */
 	status = p7_hmmfile_OpenE(hmmfile, NULL, &cfg.hfp, errbuf);
@@ -96,6 +144,16 @@ int main(int argc, char *argv[])
 
 	/* read the .hmm file */
 	status = p7_hmmfile_Read(cfg.hfp, &cfg.abc, &cfg.hmm);
+
+	/* open the msa file */
+	status = esl_msafile_Open(&(cfg.abc), alifile, NULL, eslMSAFILE_UNKNOWN, NULL, &cfg.afp);
+	if (status != eslOK) esl_msafile_OpenFailure(cfg.afp, status);
+
+	/* Read in the MSA */
+	status = esl_msafile_Read(cfg.afp, &cfg.msa);
+	if (status != eslOK) esl_msafile_ReadFailure(cfg.afp, status);
+
+
 
 	/* temporary 3-mer hpm for testing, to be deleted */
 	int M = 3;
@@ -135,6 +193,8 @@ int main(int argc, char *argv[])
 
 	}
 
+
+
 	char *hpm_outfile = "test.hpm";
 	FILE *hpm_outfp 	= 	NULL;
 	if ((hpm_outfp = fopen(hpm_outfile, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpm_outfile);
@@ -156,16 +216,64 @@ int main(int argc, char *argv[])
 	hpmDummy = hpmfile_ReadDummy("test.hpm", cfg.abc, errbuf);
 	*/
 
+
+	/* get traces for seqs in msa */
+
+	/* initiate empty trace array and match column array*/
+	P7_TRACE **tr = NULL;
+	int *matassign = NULL;
+
+	/* allocate memory for trace and match arrays */
+	ESL_ALLOC(tr, sizeof(P7_TRACE *) * cfg.msa->nseq);
+	ESL_ALLOC(matassign, sizeof(int) * (cfg.msa->alen + 1));
+
+	for (i=0; i < cfg.msa->alen; i++){
+		if (cfg.msa->rf[i] != '.') {
+			matassign[i+1] = 1;
+		}
+		else {
+			matassign[i+1] = 0;
+		}
+		//fprintf(stdout, "%d: %c, %d\n", i, cfg.msa->rf[i], matassign[i+1]);
+	}
+
+	/* assign traces to msa seqs */
+	p7_trace_FauxFromMSA(cfg.msa, matassign, p7_MSA_COORDS, tr);
+
+	/* now explore the newly created trace object */
+	/*
+	int z;
+	for (z=0; z < cfg.msa->nseq; z++) {
+		fprintf(stdout, "%d: %d %d %d %s\n", i, tr[z]->L, tr[z]->M, tr[z]->N, cfg.msa->sqname[z]);
+		fprintf(stdout, "\tj,i,k\n");
+		for (j = 0; j < tr[z]->N; j++) {
+			fprintf(stdout, "\t%d,%d,%d,%d\n", j, tr[z]->i[j],tr[z]->k[j],tr[z]->st[j]);
+			if (tr[z]->st[j] == 2) fprintf(stdout, "Match state!\n");
+		}
+	}
+	*/
+
+	/* Calculate hamiltonian for all sequences */
+	CalculateHamiltonian(cfg.hpm, tr, cfg.msa);
+
 	fprintf(stdout, "hello world!\n");
 
 	/* clean up */
 	esl_alphabet_Destroy(cfg.abc);
+	esl_sqfile_Close(cfg.sqfp);
+	esl_sq_Destroy(cfg.sq);
 	esl_msa_Destroy(cfg.msa);
 	esl_msafile_Close(cfg.afp);
 	p7_hmm_Destroy(cfg.hmm);
+
+	free(matassign);
+
 	p7_hmmfile_Close(cfg.hfp);
 	esl_getopts_Destroy(go);
 
 	return 0;
-}
 
+	ERROR:
+		return status;
+
+}
