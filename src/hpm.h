@@ -32,9 +32,19 @@ typedef struct hpm_s{
 
 } HPM;
 
+typedef struct hpmscoreset_s{
+	char   **sqname;   /* sequence names [0..nseq-1][], \0-terminated      */
+	int 		nseq;     /* number of sequences                              */
+	float   *E_potts;  /* Potts pseudo-energies [0...nseq-1]               */
+	float   *p_ins;    /* product of insertion probabilities [0...nseq-1]  */
+	float   *p_trans;  /* product of transition probabilities [0...nseq-1] */
+
+} HPM_SCORESET;
+
 /* hpm.c	*/
-extern HPM	*hpm_Create(int M, ESL_ALPHABET *abc);
-extern int   IDX(int i, int j, int K);
+extern HPM	         *hpm_Create(int M, ESL_ALPHABET *abc);
+extern HPM_SCORESET	*hpm_scoreset_Create(int nseq);
+extern int            IDX(int i, int j, int K);
 
 
 #endif

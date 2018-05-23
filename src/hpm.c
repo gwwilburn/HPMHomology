@@ -72,6 +72,31 @@ hpm_Create(int M, ESL_ALPHABET *abc)
 	return NULL;
 }
 
+HPM_SCORESET *
+hpm_scoreset_Create(int nseq)
+{
+	HPM_SCORESET *hpm_ss = NULL;
+	int           status;
+
+	ESL_ALLOC(hpm_ss, sizeof(HPM_SCORESET));
+
+	/* set number of sequences */
+	hpm_ss->nseq = nseq;
+
+	/* allocate memory for probabilities/scores */
+	ESL_ALLOC(hpm_ss->E_potts, sizeof(float) * nseq);
+	ESL_ALLOC(hpm_ss->p_ins,   sizeof(float) * nseq);
+	ESL_ALLOC(hpm_ss->p_trans, sizeof(float) * nseq);
+
+	/* allocate memory for sequence name array */
+	ESL_ALLOC(hpm_ss->sqname, sizeof(char *) * nseq);
+
+	return hpm_ss;
+
+	ERROR:
+		return NULL;
+}
+
 int IDX(int i, int j, int K) {
 
 	return (i*K) + j;
