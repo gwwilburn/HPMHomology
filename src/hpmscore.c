@@ -26,6 +26,7 @@ struct cfg_s { /* shared configuration in master and workers */
 	P7_HMMFILE		 *hfp;		/* input hmm file						*/
 	P7_HMM			 *hmm;		/* input hmm							*/
 	HPM				 *hpm;		/* hidden potts model				*/
+	HPM_SCORESET    *hpm_ss;   /* for storing hpm sores         */
 
 };
 
@@ -54,23 +55,77 @@ cmdline_failure(char *argv0, char *format, ...)
 	exit(1);
 }
 
-int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa) {
-	int z;    /* index for trace elements */
-	int n;    /* position index          */
+int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
+	int   z;    /* index for trace elements 	     */
+	int   y;    /* index for trace elements 	     */
+	int   n;    /* sequence index          	     */
+	int   i;    /* match state index			        */
+	int   j;    /* match state index	    		     */
+	int   a;    /* residue index            	     */
+	int   b;    /* residue index           	     */
+	int   idx;  /* index for potts parameters      */
+	float E;    /* pseudo-energy, aka Hamiltonian  */
 
 	/* loop over sequences */
 	for (n=0; n < msa->nseq; n++) {
+
+		E = 0.0;
+
 		/* print out sequence info */
 		fprintf(stdout, "%d: %d %d %d %s\n", z, tr[n]->L, tr[n]->M, tr[n]->N, msa->sqname[n]);
+
 		/* loop over trace positions for this seq */
 		for (z = 0; z < tr[n]->N; z++) {
+
 			/* check if we are in a match or delete state */
-			if (tr[n]->st[z] == 2 || tr[n]->st[z] == 6 ) {
-			//if (tr[n]->st[z] == P7T_M || tr[n]->st[z] == p7T_D ) {
-				/* print out trace position, alignment column, and sequence residue in this col */
-				fprintf(stdout, "\t %d: %d, %d\n", z, tr[n]->i[z], msa->ax[n][tr[n]->i[z]]);
+			if (tr[n]->st[z] == 2 || tr[n]->st[z] == 6) {
+
+				i = tr[n]->k[z];
+
+				//fprintf(stdout, "\t %d\n", i);
+
+				/* we have a match position */
+				//if (tr[n]->st[z] == P7T_M ) {
+				if (tr[n]->st[z] == 2) {
+					a = msa->ax[n][tr[n]->i[z]];
+				}
+
+				/* we have a delete position */
+				//else if ( tr[n]->st[z] == p7T_D ) {
+				else if (tr[n]->st[z] == 6) {
+					a = 20;
+				}
+
+				E = E + hpm->h[i][a];
+
+				/* now add e_ij terms to pseudo-energy */
+				for (y = z+1; y < tr[n]->N; y++) {
+
+					/* check if we are in a match position */
+					 if (tr[n]->st[y] == 2 || tr[n]->st[y] == 6) {
+
+						 j = tr[n]->k[y];
+
+						/* we have a match state */
+						if (tr[n]->st[z] == 2) {
+							b =  msa->ax[n][tr[n]->i[y]];
+						}
+
+						/* we have a match position */
+						else if (tr[n]->st[z] == 6) {
+							b = 20;
+						}
+
+						idx = IDX(a,b,msa->abc->K+1);
+						//fprintf(stdout, "\t\t %d %d, %d, %d, %d \n", i, j, idx, a, b);
+						E += hpm->e[i][j][idx];
+
+					 }
+				}
 			}
+
 		}
+		fprintf(stdout, "E: %.6f\n", E);
 	}
 
 
@@ -154,9 +209,11 @@ int main(int argc, char *argv[])
 	if (status != eslOK) esl_msafile_ReadFailure(cfg.afp, status);
 
 
+	/* Set up the score set object */
+	cfg.hpm_ss = hpm_scoreset_Create(cfg.msa->nseq);
 
-	/* temporary 3-mer hpm for testing, to be deleted */
-	int M = 3;
+	/* temporary N-mer hpm for testing, to be deleted */
+	int M = 99; // for PF00042 seed
 	cfg.hpm = hpm_Create(M, cfg.abc);
 
 	int a;
@@ -168,11 +225,11 @@ int main(int argc, char *argv[])
 	/* fill in e_ij's */
 	for (a = 0; a < cfg.abc->K+1; a++) {
 		for (i = 1; i < M+1; i++) {
-			cfg.hpm->h[i][a] = (0.1 * (i-1))  + (0.0001 * a);
+			cfg.hpm->h[i][a] = (0.1 * (i))  + (0.0001 * a);
 			for (b = 0; b < cfg.abc->K+1; b++) {
 				for (j = 1; j < i; j++) {
-					cfg.hpm->e[i][j][IDX(a,b,cfg.hpm->abc->K+1)] = (0.1 * (i-1)) + (0.01*(j-1)) + (0.0001 * a) + (0.000001 * b);
-					cfg.hpm->e[j][i][IDX(b,a,cfg.hpm->abc->K+1)] = (0.1 * (i-1)) + (0.01*(j-1)) + (0.0001 * a) + (0.000001 * b);
+					cfg.hpm->e[i][j][IDX(a,b,cfg.hpm->abc->K+1)] = (1.0 * (i)) + (0.01*(j)) + (0.0001 * a) + (0.000001 * b);
+					cfg.hpm->e[j][i][IDX(b,a,cfg.hpm->abc->K+1)] = (1.0 * (i)) + (0.01*(j)) + (0.0001 * a) + (0.000001 * b);
 				}
 			}
 
@@ -184,11 +241,11 @@ int main(int argc, char *argv[])
 
 	int k;
 	for (k = 0; k < M+1; k++) {
-		cfg.hpm->t[k][HPM_MM] = 1.0 - (0.1*(k+1));
-		cfg.hpm->t[k][HPM_MI] = (0.1*(k+1));
+		cfg.hpm->t[k][HPM_MM] = 1.0 - (0.001*(k+1));
+		cfg.hpm->t[k][HPM_MI] = (0.001*(k+1));
 		if (k < M+1) {
-			cfg.hpm->t[k][HPM_IM] = 1.0 - (0.1*(k+1));
-			cfg.hpm->t[k][HPM_II] = (0.1*(k+1));
+			cfg.hpm->t[k][HPM_IM] = 1.0 - (0.001*(k+1));
+			cfg.hpm->t[k][HPM_II] = (0.001*(k+1));
 		}
 
 	}
@@ -254,7 +311,7 @@ int main(int argc, char *argv[])
 	*/
 
 	/* Calculate hamiltonian for all sequences */
-	CalculateHamiltonian(cfg.hpm, tr, cfg.msa);
+	CalculateHamiltonian(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 
 	fprintf(stdout, "hello world!\n");
 
