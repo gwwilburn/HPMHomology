@@ -1,9 +1,11 @@
 #include "hpm.h"
 
+#include "p7_config.h"
+#include "hmmer.h"
 #include "easel.h"
 #include "esl_alphabet.h"
 #include "esl_composition.h"
-
+#include "potts.h"
 
 HPM *
 hpm_Create(int M, ESL_ALPHABET *abc)
@@ -72,10 +74,62 @@ hpm_Create(int M, ESL_ALPHABET *abc)
 	return NULL;
 }
 
+HPM *
+hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
+
+	HPM   *hpm   = NULL;   /* hpm object to return */
+	int 	 status;
+	int    i;              /* position index 		    */
+	int    j;				  /* position index         */
+	int    a;				  /* character index        */
+	int    b;              /* character index        */
+	int    idx;            /* character combo-index  */
+	int    idx_rev;        /* character combo-index  */
+
+	/* check to make sure number of match states are equal */
+	if      (potts->L != hmm->M)     p7_Fail("Length of potts model is %d. HMM has %d match states. These must match!\n", potts->L, hmm->M);
+	/* check to make sure alphabets are equal */
+	if      (potts->abc != hmm->abc) p7_Fail("Potts alphabet and hmm alphabet do not match!\n", potts->L, hmm->M);
+
+	ESL_ALLOC(hpm, sizeof(HPM));
+
+	/* create hpm with appropriate  number of match states */
+	hpm = hpm_Create(hmm->M, potts->abc);
+
+	/* copy over potts parameters */
+	for (i=0; i<hpm->M; i++) {
+		for (a = 0; a < (hpm->abc->K+1); a++){
+			/* assign h_i's */
+			hpm->h[i+1][a] = potts->h[i][a];
+
+			for (j = i+1; j<hpm->M; j++) {
+				for (b = 0; b < (hpm->abc->K+1); b++) {
+
+					/* assign e_ij's */
+					idx = IDX(a,b,hpm->abc->K+1);
+					idx_rev = IDX(b,a,hpm->abc->K+1);
+					hpm->e[i+1][j+1][idx]     = potts->e[i][j][idx];
+					hpm->e[j+1][i+1][idx_rev] = potts->e[j][i][idx_rev];
+				}
+			}
+		}
+
+	}
+
+
+	return hpm;
+
+	ERROR:
+		return NULL;
+
+
+}
+
 HPM_SCORESET *
 hpm_scoreset_Create(int nseq)
 {
 	HPM_SCORESET *hpm_ss = NULL;
+	int           n;
 	int           status;
 
 	ESL_ALLOC(hpm_ss, sizeof(HPM_SCORESET));
@@ -83,18 +137,46 @@ hpm_scoreset_Create(int nseq)
 	/* set number of sequences */
 	hpm_ss->nseq = nseq;
 
+	/* allocate memory for sequence name array */
+	ESL_ALLOC(hpm_ss->sqname, sizeof(char *) * nseq);
+
 	/* allocate memory for probabilities/scores */
 	ESL_ALLOC(hpm_ss->E_potts, sizeof(float) * nseq);
 	ESL_ALLOC(hpm_ss->p_ins,   sizeof(float) * nseq);
 	ESL_ALLOC(hpm_ss->p_trans, sizeof(float) * nseq);
 
-	/* allocate memory for sequence name array */
-	ESL_ALLOC(hpm_ss->sqname, sizeof(char *) * nseq);
+	for (n = 0; n < nseq; n++) {
+		hpm_ss->E_potts[n] = 0.0;
+		hpm_ss->p_ins[n]   = 0.0;
+		hpm_ss->p_trans[n] = 0.0;
+	}
 
 	return hpm_ss;
 
 	ERROR:
 		return NULL;
+}
+
+/* for now, write hpm scores to a csv */
+int
+hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_ss){
+	int n;
+
+	/* write csv header line */
+
+	fprintf(fp,"id,hamiltonian,p_ins,p_trans\n");
+
+	/* loop over sequences, print id and scores */
+	for (n = 0; n < hpm_ss->nseq; n++) {
+		fprintf(fp, "%s,%.4f,%.4f,%.4f\n",
+				  hpm_ss->sqname[n],
+				  hpm_ss->E_potts[n],
+				  hpm_ss->p_ins[n],
+				  hpm_ss->p_trans[n]);
+
+	}
+
+	return eslOK;
 }
 
 int IDX(int i, int j, int K) {

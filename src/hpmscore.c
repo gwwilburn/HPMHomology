@@ -101,7 +101,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 				else if (tr[n]->st[z] == 6) {
 					a = 20;
 				}
-
+				//fprintf(stdout, "h: i=%d, a=%d, h[i][a] = %.4f \n", i, a,  hpm->h[i][a]);
 				E = E + hpm->h[i][a];
 
 				/* now add e_ij terms to pseudo-energy */
@@ -224,82 +224,29 @@ int main(int argc, char *argv[])
 	//cfg.potts = potts_Create(L, cfg.abc);
 	cfg.potts = pottsfile_Read("../../data/Globins/PF00042_seed_consensus.rsc", cfg.abc, errbuf);
 
+
+	/* combine hmm and potts object to create hpm object */
+	cfg.hpm = hpm_Create_hmm_potts(cfg.hmm, cfg.potts, cfg.abc);
 	/* temporary N-mer hpm for testing, to be deleted */
-	int M = 99; // for PF00042 seed
-	cfg.hpm = hpm_Create(M, cfg.abc);
+	//int M = 99; // for PF00042 seed
+	//cfg.hpm = hpm_Create(M, cfg.abc);
 
-	int a;
-	int b;
 	int i;
-	int j;
-
-	char *test1 = "-1";
-	char *test2 = "1-1";
-	char *test3 = "-1-1";
-	char *test4 = "-1.0";
-	char *test5 = "1";
-	char *test6 = "2.5";
-
-	fprintf(stdout, "%s: %d\n", test1, IsInt(test1));
-	fprintf(stdout, "%s: %d\n", test2, IsInt(test2));
-	fprintf(stdout, "%s: %d\n", test3, IsInt(test3));
-	fprintf(stdout, "%s: %d\n", test4, IsInt(test4));
-	fprintf(stdout, "%s: %d\n", test5, IsInt(test5));
-	fprintf(stdout, "%s: %d\n", test6, IsInt(test6));
-
-	/*
-	for (i=0; i < cfg.potts->L; i++) {
-	  fprintf(stdout, "%d ", i);
-	  for (a =0; a < cfg.abc->K +1; a++) {
-			fprintf(stdout, "%.4f ", cfg.potts->h[i][a]);
-	  }
-	  fprintf(stdout, "\n");
-	}
-
-	for (i=0; i < cfg.potts->L; i++) {
-		for (j = i+1; j < cfg.potts->L; j++) {
-
-			fprintf(stdout, "\n%d %d\n", i,j);
-			for (a =0; a < cfg.abc->K +1; a++) {
-				for (b =0; b < cfg.abc->K +1; b++) {
-					fprintf(stdout, "%.4f ", cfg.potts->e[i][j][IDX(a,b,cfg.abc->K +1)]);
-
-				}
-				fprintf(stdout, "\n");
-
-			}
-		}
-	}
-	*/
-
-	/* fill in e_ij's */
-	for (a = 0; a < cfg.abc->K+1; a++) {
-		for (i = 1; i < M+1; i++) {
-			cfg.hpm->h[i][a] = (0.1 * (i))  + (0.0001 * a);
-			for (b = 0; b < cfg.abc->K+1; b++) {
-				for (j = 1; j < i; j++) {
-					cfg.hpm->e[i][j][IDX(a,b,cfg.hpm->abc->K+1)] = (1.0 * (i)) + (0.01*(j)) + (0.0001 * a) + (0.000001 * b);
-					cfg.hpm->e[j][i][IDX(b,a,cfg.hpm->abc->K+1)] = (1.0 * (i)) + (0.01*(j)) + (0.0001 * a) + (0.000001 * b);
-				}
-			}
-
-		}
-
-	}
 
 
 
+
+	/* fill in dummy transition probs, to be deleted */
 	int k;
-	for (k = 0; k < M+1; k++) {
+	for (k = 0; k < cfg.hpm->M+1; k++) {
 		cfg.hpm->t[k][HPM_MM] = 1.0 - (0.001*(k+1));
 		cfg.hpm->t[k][HPM_MI] = (0.001*(k+1));
-		if (k < M+1) {
+		if (k < cfg.hpm->M+1) {
 			cfg.hpm->t[k][HPM_IM] = 1.0 - (0.001*(k+1));
 			cfg.hpm->t[k][HPM_II] = (0.001*(k+1));
 		}
 
 	}
-
 
 
 	char *hpm_outfile = "test.hpm";
@@ -363,13 +310,6 @@ int main(int argc, char *argv[])
 	/* Calculate hamiltonian for all sequences */
 	CalculateHamiltonian(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 
-	/* print out potts scores */
-	/*
-	int n;
-	for (n=0; n < cfg.hpm_ss->nseq; n++) {
-		fprintf(stdout, "%s: %f\n", cfg.hpm_ss->sqname[n], cfg.hpm_ss->E_potts[n]);
-	}
-	*/
 
 	/* write potts scores to outfile */
 	char *hpm_ss_outfile = "test_hpm_ss.csv";
@@ -380,7 +320,7 @@ int main(int argc, char *argv[])
 	fclose(hpm_ss_outfp);
 
 	/* print hello world */
-	//fprintf(stdout, "hello world!\n");
+	fprintf(stdout, "hello world!\n");
 
 	/* clean up */
 	esl_alphabet_Destroy(cfg.abc);
