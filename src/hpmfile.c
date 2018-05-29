@@ -268,6 +268,7 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
 				} else {
 					if (tok_count > 0) {
 						ret_hpm->e[i][j][IDX(a,tok_count-1,abc->K+1)] = atof(tok);
+						ret_hpm->e[j][i][IDX(tok_count-1,a,abc->K+1)] = atof(tok);
 					}
 
 				}

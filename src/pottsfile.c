@@ -94,6 +94,7 @@ pottsfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf){
 				}
 				else {
 					ret_potts->e[i][j][IDX(a,tok_count,abc->K+1)] = atof(tok);
+					ret_potts->e[j][i][IDX(tok_count,a,abc->K+1)] = atof(tok);
 				}
 			tok_count ++;
 			prev_tok = tok;
