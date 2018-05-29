@@ -11,6 +11,32 @@
 
 static int printprob(FILE *fp, int fieldwidth, float p);
 
+
+int IsInt(char *str){
+	int i;
+	int n = strlen(str);
+
+	for (i=0; i<n; i++) {
+		/* check ASCII value of character */
+
+		/* we allow '-' on the first character only */
+		if (i == 0) {
+			if ( (str[i] < 48 || str[i] > 57) && str[i] != 45) {
+				return 0;
+			}
+		}
+		else {
+			if (str[i] < 48 || str[i] > 57) {
+				return 0;
+
+			}
+		}
+	}
+
+
+	return 1;
+
+}
 /* Functions for writing .hpm files */
 
 int hpmfile_Write(FILE *fp, HPM *hpm) {
@@ -233,7 +259,7 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
 				}
 
 				/* if the line starts with two integers, those are i and j */
-				if ( (tok_count == 1) && (atoi(tok) > 0) && (atoi(prev_tok)>0)) {
+				if ( (tok_count == 1) && (IsInt(tok)) && (IsInt(prev_tok))) {
 					i = atoi(prev_tok);
 					j = atoi(tok);
 					a = -1;
