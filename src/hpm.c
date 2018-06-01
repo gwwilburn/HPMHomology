@@ -77,14 +77,15 @@ hpm_Create(int M, ESL_ALPHABET *abc)
 HPM *
 hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 
-	HPM   *hpm   = NULL;   /* hpm object to return */
+	HPM   *hpm      = NULL;   /* hpm object to return */
 	int 	 status;
-	int    i;              /* position index 		    */
-	int    j;				  /* position index         */
-	int    a;				  /* character index        */
-	int    b;              /* character index        */
-	int    idx;            /* character combo-index  */
-	int    idx_rev;        /* character combo-index  */
+	int    i;                 /* position index 		    */
+	int    j;				     /* position index         */
+	int    a;				     /* character index        */
+	int    b;                 /* character index        */
+	int    idx;               /* character combo-index  */
+	int    idx_rev;           /* character combo-index  */
+	float *mocc    = NULL;    /* hmm match state probs  */
 
 	/* check to make sure number of match states are equal */
 	if      (potts->L != hmm->M)     p7_Fail("Length of potts model is %d. HMM has %d match states. These must match!\n", potts->L, hmm->M);
@@ -92,9 +93,16 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 	if      (potts->abc != hmm->abc) p7_Fail("Potts alphabet and hmm alphabet do not match!\n", potts->L, hmm->M);
 
 	ESL_ALLOC(hpm, sizeof(HPM));
+	ESL_ALLOC(mocc, sizeof(float)*(hmm->M+1));
 
 	/* create hpm with appropriate  number of match states */
 	hpm = hpm_Create(hmm->M, potts->abc);
+
+	/* copy insert emission from hmm as-is */
+	/* this throws an error for now */
+	/* but the swissprot freqs are assigned in hpm_create, will fix later */
+	//hpm->ins = hmm->ins;
+
 
 	/* copy over potts parameters */
 	for (i=0; i<hpm->M; i++) {
@@ -113,8 +121,41 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 				}
 			}
 		}
-
 	}
+
+	/* calculate hpm transition probahilities */
+
+
+	/* indices for hmm transitions */
+	int hmm_MM = 0;
+	int hmm_MI = 1;
+	int hmm_MD = 2;
+	int hmm_IM = 3;
+	int hmm_II = 4;
+
+	/* obtain match state probabilities from hmm */
+	p7_hmm_CalculateOccupancy(hmm, mocc, NULL);
+
+	/* transitions from begin state */
+	hpm->t[0][HPM_MM] = hmm->t[0][hmm_MM] + hmm->t[0][hmm_MD];
+	hpm->t[0][HPM_MI] = hmm->t[0][hmm_MI];
+	hpm->t[0][HPM_IM] = hmm->t[0][hmm_IM];
+	hpm->t[0][HPM_II] = hmm->t[0][hmm_II];
+
+	/* intermediate transitions */
+	for (i = 1; i < hpm->M; i++) {
+		hpm->t[i][HPM_MM] = ((hmm->t[i][hmm_MM] + hmm->t[i][hmm_MD]) * mocc[i]) + (1.0 - mocc[i]);
+		hpm->t[i][HPM_MI] = hmm->t[i][hmm_MI] * mocc[i];
+		hpm->t[i][HPM_IM] = hmm->t[i][hmm_IM];
+		hpm->t[i][HPM_II] = hmm->t[i][hmm_II];
+	}
+
+	/* transitions into end state */
+	hpm->t[hpm->M][HPM_MM] = (hmm->t[hpm->M][hmm_MM] * mocc[i]) + (1.0 - mocc[i]);
+	hpm->t[hpm->M][HPM_MI] = mocc[i]*hmm->t[0][hmm_MI];
+	hpm->t[hpm->M][HPM_IM] = hmm->t[0][hmm_IM];
+	hpm->t[hpm->M][HPM_II] = hmm->t[0][hmm_II];
+
 
 
 	return hpm;

@@ -26,7 +26,7 @@ typedef struct hpm_s{
 
 	int		  		 M;				/* number of nodes in model 					*/
 	double 		  **t;				/* transition probs 								*/
-	double	 		**ins;			/* insert emission probs					*/
+	double	 	  **ins;	      	/* insert emission probs					*/
 	float    	  **h;				/* site-specific h_i params					*/
 	float   		 ***e;				/* coupling e_ij params							*/
 	int				 nTransition;  /* number of transitions, should be 4 		*/
