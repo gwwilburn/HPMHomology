@@ -14,10 +14,13 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile potts pottsfile hpmscore
+all: hpm hpmbuild hpmfile potts pottsfile hpmscore
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.c hpmfile.c potts.c pottsfile.c
+
+hpmbuild: hpmbuild.c
+	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.c hpmfile.c potts.c pottsfile.c
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
@@ -34,6 +37,6 @@ pottsfile: pottsfile.c
 
 
 clean:
-	rm -f hpmscore hpm.o hpmfile.o potts.o pottsfile.o
+	rm -f hpmscore hpmbuild hpm.o hpmfile.o potts.o pottsfile.o
 
 .PHONY: all clean
