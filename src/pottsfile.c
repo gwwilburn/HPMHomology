@@ -58,13 +58,12 @@ pottsfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf){
 	}
 
 	esl_fileparser_Close(efp);
-
+	fprintf(stdout, "%d\n", ret_potts->L);
 
 	/* loop through again to get potts parameters */
  	if (esl_fileparser_Open(f, NULL, &efp) != eslOK)  ESL_XFAIL(eslFAIL, errbuf, "file open failed");
 
 	while (esl_fileparser_NextLine(efp) == eslOK) {
-
 		/* we are in the h_i section */
 		if (lc < ret_potts->L)
 		{
@@ -86,13 +85,15 @@ pottsfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf){
 		else {
 			tok_count = 0;
 			while (esl_fileparser_GetTokenOnLine(efp, &tok, NULL) == eslOK) {
+
 				/* if the line starts with two integers, those are i and j */
-				if ( (tok_count == 1) && (IsInt(tok) > 0) && (IsInt(prev_tok))) {
+				if ( (tok_count == 1) && (IsInt(tok)) && (IsInt(prev_tok))) {
 					i = atoi(prev_tok);
 					j = atoi(tok);
 					a = -1;
 				}
-				else {
+				/* if the token is a float, we have a potts parameter */
+				else if (IsInt(tok) == 0) {
 					ret_potts->e[i][j][IDX(a,tok_count,abc->K+1)] = atof(tok);
 					ret_potts->e[j][i][IDX(tok_count,a,abc->K+1)] = atof(tok);
 				}
