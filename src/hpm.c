@@ -125,7 +125,6 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 
 	/* calculate hpm transition probahilities */
 
-
 	/* indices for hmm transitions */
 	int hmm_MM = 0;
 	int hmm_MI = 1;
@@ -183,13 +182,13 @@ hpm_scoreset_Create(int nseq)
 
 	/* allocate memory for probabilities/scores */
 	ESL_ALLOC(hpm_ss->E_potts, sizeof(float) * nseq);
-	ESL_ALLOC(hpm_ss->p_ins,   sizeof(float) * nseq);
-	ESL_ALLOC(hpm_ss->p_trans, sizeof(float) * nseq);
+	ESL_ALLOC(hpm_ss->lp_ins,   sizeof(float) * nseq);
+	ESL_ALLOC(hpm_ss->lp_trans, sizeof(float) * nseq);
 
 	for (n = 0; n < nseq; n++) {
 		hpm_ss->E_potts[n] = 0.0;
-		hpm_ss->p_ins[n]   = 0.0;
-		hpm_ss->p_trans[n] = 0.0;
+		hpm_ss->lp_ins[n]   = 0.0;
+		hpm_ss->lp_trans[n] = 0.0;
 	}
 
 	return hpm_ss;
@@ -205,15 +204,15 @@ hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_ss){
 
 	/* write csv header line */
 
-	fprintf(fp,"id,hamiltonian,p_ins,p_trans\n");
+	fprintf(fp,"id,hamiltonian,lp_ins,lp_trans\n");
 
 	/* loop over sequences, print id and scores */
 	for (n = 0; n < hpm_ss->nseq; n++) {
 		fprintf(fp, "%s,%.4f,%.4f,%.4f\n",
 				  hpm_ss->sqname[n],
 				  hpm_ss->E_potts[n],
-				  hpm_ss->p_ins[n],
-				  hpm_ss->p_trans[n]);
+				  hpm_ss->lp_ins[n],
+				  hpm_ss->lp_trans[n]);
 
 	}
 

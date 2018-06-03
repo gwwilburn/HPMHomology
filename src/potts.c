@@ -12,7 +12,7 @@ potts_Create(int L, ESL_ALPHABET *abc)
 	POTTS 	*potts     = NULL;      /* potts model object to return */
 	int 		 status;
 
-	int       Kg        = abc->K+1;  /* alphabet size w/ gap char     */
+	int       Kg        = abc->K+1;  /* alphabet size w/ gap char    */
 	int       Kg2       = Kg*Kg;
 
 	int       i;

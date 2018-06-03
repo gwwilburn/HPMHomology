@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "easel.h"
 #include "esl_alphabet.h"
@@ -72,7 +73,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 	/* copy over sqname */
 	hpm_ss->sqname = msa->sqname;
 
-		/* loop over sequences */
+	/* loop over sequences */
 	for (n=0; n < msa->nseq; n++) {
 
 		E = 0.0;
@@ -138,6 +139,117 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 	return eslOK;
 }
+
+int CalculateInsertProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
+	int   z;    /* index for trace elements 	     */
+	int   n;    /* sequence index          	     */
+	int   i;    /* match state index			        */
+	int   a;    /* residue index            	     */
+	float lp;   /* log of insert emission probs    */
+
+	/* loop over sequences */
+	for (n=0; n < msa->nseq; n++) {
+		lp = 0.0;
+		//fprintf(stdout, "%s\n", msa->sqname[n]);
+
+		/* loop over trace positions for this seq */
+      for (z = 0; z < tr[n]->N; z++) {
+
+
+			/* we have an insert position */
+			if (tr[n]->st[z] == 4) {
+				/* last match state */
+				i = tr[n]->k[z];
+				/* residue */
+				a = msa->ax[n][tr[n]->i[z]];
+				lp = lp + log(hpm->ins[i][a]);
+			}
+		}
+		hpm_ss->lp_ins[n] = lp;
+		//fprintf(stdout, "%f\n", hpm_ss->lp_ins[n]);
+
+	}
+
+
+
+	return eslOK;
+}
+
+int CalculateTransitionProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
+	int   z;            /* index for trace elements 	     */
+	int   st;           /* state id index           	     */
+	int   stprev;       /* state id index           	     */
+	int   trans;        /* transition id index       	     */
+	int   n;            /* sequence index            	     */
+	int   i;            /* match state index			        */
+	int   iprev;        /* match state index			        */
+	float lp;           /* log of insert emission probs     */
+
+	/* loop over sequences */
+	for (n=0; n < msa->nseq; n++) {
+		lp = 0.0;
+		stprev = -1;
+		iprev = -1;
+
+		/* loop over trace positions for this seq */
+      for (z = 0; z < tr[n]->N; z++) {
+			st = tr[n]->st[z];
+
+			/* handle begin state */
+			if ( st == 11) {
+				/* this is effectively the 0th match state */
+				stprev = 2;
+				iprev = 0;
+			}
+
+			/* we have an insert position */
+			if ( st == 2 || st == 4 || st == 6 || st == 12) {
+				/* match state */
+				i = tr[n]->k[z];
+
+				/* current state is hybrid match-delete or end */
+				if (st == 2 || st == 6 || st == 12) {
+
+					/* M->M transition */
+					if ( stprev == 2 || stprev == 6) {
+						trans = HPM_MM;
+					}
+
+					/* I->M transition */
+					if ( stprev == 4) {
+						trans = HPM_IM;
+					}
+				}
+
+				/* current state is an insert state */
+				else if (st == 4) {
+					/* M->I transition */
+					if ( stprev == 2 || stprev == 6) {
+						trans = HPM_MI;
+					}
+
+					/* I->I transition */
+					if ( stprev == 4) {
+						trans = HPM_II;
+					}
+				}
+				/* add log of prob ot this transition */
+				lp += log(hpm->t[iprev][trans]);
+				stprev = st;
+				iprev = i;
+			}
+		}
+
+		/* add this seq's transition prob to score set */
+		hpm_ss->lp_trans[n] = lp;
+
+	}
+
+
+	return eslOK;
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -231,22 +343,9 @@ int main(int argc, char *argv[])
 	//int M = 99; // for PF00042 seed
 	//cfg.hpm = hpm_Create(M, cfg.abc);
 
+	/* check that transition probabilities out of states are normalized */
 	int i;
-
-
-
-
-	/* fill in dummy transition probs, to be deleted */
-	int k;
-	for (k = 0; k < cfg.hpm->M+1; k++) {
-		cfg.hpm->t[k][HPM_MM] = 1.0 - (0.001*(k+1));
-		cfg.hpm->t[k][HPM_MI] = (0.001*(k+1));
-		if (k < cfg.hpm->M+1) {
-			cfg.hpm->t[k][HPM_IM] = 1.0 - (0.001*(k+1));
-			cfg.hpm->t[k][HPM_II] = (0.001*(k+1));
-		}
-
-	}
+	//int a;
 
 
 	char *hpm_outfile = "test.hpm";
@@ -309,8 +408,18 @@ int main(int argc, char *argv[])
 
 	/* Calculate hamiltonian for all sequences */
 	CalculateHamiltonian(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
+	/* Calculate insert probabilities for all seqs */
+	CalculateInsertProbs(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
+	/* Calculate transition probabilities for all seqs */
+	CalculateTransitionProbs(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 
+	/*
+	int n;
+	for (n=0; n < cfg.hpm_ss->nseq; n++){
+		fprintf(stdout, "%s: %f, %f, %f \n", cfg.hpm_ss->sqname[n], cfg.hpm_ss->E_potts[n], cfg.hpm_ss->lp_ins[n], cfg.hpm_ss->lp_trans[n]);
 
+	}
+	*/
 	/* write potts scores to outfile */
 	char *hpm_ss_outfile = "test_hpm_ss.csv";
 	FILE *hpm_ss_outfp   =  NULL;

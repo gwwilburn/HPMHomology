@@ -39,8 +39,8 @@ typedef struct hpmscoreset_s{
 	char   **sqname;   /* sequence names [0..nseq-1][], \0-terminated      */
 	int 		nseq;     /* number of sequences                              */
 	float   *E_potts;  /* Potts pseudo-energies [0...nseq-1]               */
-	float   *p_ins;    /* product of insertion probabilities [0...nseq-1]  */
-	float   *p_trans;  /* product of transition probabilities [0...nseq-1] */
+	float   *lp_ins;    /* product of insertion probabilities [0...nseq-1]  */
+	float   *lp_trans;  /* product of transition probabilities [0...nseq-1] */
 
 } HPM_SCORESET;
 
