@@ -14,7 +14,7 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmbuild hpmfile potts pottsfile hpmscore
+all: hpm hpmfile potts pottsfile hpmscore hpmbuild
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.c hpmfile.c potts.c pottsfile.c
