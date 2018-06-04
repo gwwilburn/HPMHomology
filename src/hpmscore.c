@@ -24,13 +24,9 @@ struct cfg_s { /* shared configuration in master and workers */
 	ESL_ALPHABET	 *abc;
 	ESL_MSAFILE   	 *afp;     	/* input ali file						*/
 	ESL_MSA			 *msa;     	/* input msa							*/
-	ESL_SQFILE		 *sqfp;     /* input sequence file           */
-	ESL_SQ			 *sq;       /* sequence object					*/
 	P7_HMMFILE		 *hfp;		/* input hmm file						*/
-	P7_HMM			 *hmm;		/* input hmm							*/
 	HPM				 *hpm;		/* hidden potts model				*/
 	HPM_SCORESET    *hpm_ss;   /* for storing hpm sores         */
-	POTTS           *potts;    /* potts model                   */
 
 };
 
@@ -45,7 +41,7 @@ static ESL_OPTIONS options[] = {
 	{ "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<seqfile> contains RNA sequences",                        2 },
 	{ 0,0,0,0,0,0,0,0,0,0 },
 };
-static char usage[]  = "[-options] <seqfile>";
+static char usage[]  = "[-options] <hpmfile> <seqfile> <scoreoutfile>";
 
 static void
 cmdline_failure(char *argv0, char *format, ...)
@@ -255,11 +251,13 @@ int main(int argc, char *argv[])
 {
 	ESL_GETOPTS    *go;															/* cmd line configuration 			*/
 	struct cfg_s    cfg;  														/* application configuration 		*/
-	char           *seqfile 					= NULL;						/* sequence file path		 		*/
 	char           *alifile 					= NULL;						/* alignment file path		 		*/
-	int             infmt               	= eslSQFILE_UNKNOWN;
-	int				 alphatype    				= eslUNKNOWN;         	/*	for guessing alphabet			*/
-	char				*hmmfile 					= NULL;						/* hmm file path						*/
+	char				*hpmfile 					= NULL;						/* hmm file path						*/
+	char				*scorefile 	    			= NULL;						/* hpm score output file path	   */
+	FILE				*hpm_ss_fp 	    			= NULL;						/* hpm score output file object	*/
+	P7_TRACE      **tr                     = NULL;                 /* trace for alignment paths     */
+	int            *matassign              = NULL;                 /* array for ali match positions */
+	int             i;                                             /* ali position index            */
 	int				 status;														/* easel return code 				*/
 	char            errbuf[eslERRBUFSIZE];
 
@@ -267,59 +265,23 @@ int main(int argc, char *argv[])
 	go = esl_getopts_Create(options);
 	if (esl_opt_ProcessCmdline(go, argc, argv) != eslOK) cmdline_failure(argv[0], "Failed to parse command line: %s\n", go->errbuf);
 	if (esl_opt_VerifyConfig(go) 					 != eslOK) cmdline_failure(argv[0], "Error in app configuration:   %s\n", go->errbuf);
-	//if (esl_opt_ArgNumber(go)						 != 2) 	  cmdline_failure(argv[0], "Incorrect number of command line arguments.\n", go->errbuf);
 	if (esl_opt_ArgNumber(go)						 != 3) 	  cmdline_failure(argv[0], "Incorrect number of command line arguments.\n", go->errbuf);
 
-	hmmfile  = esl_opt_GetArg(go, 1);
-	seqfile  = esl_opt_GetArg(go, 2);
-	alifile  = esl_opt_GetArg(go, 3);
+	hpmfile    = esl_opt_GetArg(go, 1);
+	alifile    = esl_opt_GetArg(go, 2);
+	scorefile  = esl_opt_GetArg(go, 3);
 
 	/* Set up the configuration structure shared amongst functions here */
 	cfg.abc = NULL; /* until we read the seq file below */
-
-	/* open the sequence file */
-	status = esl_sqfile_Open(seqfile, infmt, NULL, &cfg.sqfp);
 
 	/* Determine alphabet */
 	if 		(esl_opt_GetBoolean(go, "--amino"))		cfg.abc = esl_alphabet_Create(eslAMINO);
 	else if  (esl_opt_GetBoolean(go, "--dna"))		cfg.abc = esl_alphabet_Create(eslDNA);
 	else if  (esl_opt_GetBoolean(go, "--rna"))		cfg.abc = esl_alphabet_Create(eslRNA);
-	else {
-		status = esl_sqfile_GuessAlphabet(cfg.sqfp, &alphatype);
-		cfg.abc = esl_alphabet_Create(alphatype);
-	}
 
-	esl_alphabet_SetEquiv(cfg.abc, '.', '-'); /* allow '.' as gap char too */
-
-	/* prepare to read in sequences */
-	cfg.sq  = esl_sq_CreateDigital(cfg.abc);
-	esl_sqfile_SetDigital(cfg.sqfp, cfg.abc);
-
-	/* loop through seqs in file */
-
-	while ((status = esl_sqio_Read(cfg.sqfp, cfg.sq)) == eslOK) {
-		//esl_sqio_Write(stdout, cfg.sq, eslSQFILE_FASTA, /*update=*/FALSE);
-		esl_sq_Reuse(cfg.sq);
-
-	}
-
-	/* common error handling */
-	if      (status == eslEFORMAT) esl_fatal("Parse failed\n  %s", esl_sqfile_GetErrorBuf(cfg.sqfp));
-	else if (status != eslEOF)     esl_fatal("Unexpected error %d in reading", status);
-
-
-	/* Open the .hmm file */
-	status = p7_hmmfile_OpenE(hmmfile, NULL, &cfg.hfp, errbuf);
-	/* error handling below copied from hmmsearch */
-	if      (status == eslENOTFOUND) p7_Fail("File existence/permissions problem in trying to open HMM file %s.\n%s\n", hmmfile, errbuf);
-	else if (status == eslEFORMAT)   p7_Fail("File format problem in trying to open HMM file %s.\n%s\n",                hmmfile, errbuf);
-	else if (status != eslOK)        p7_Fail("Unexpected error %d in opening HMM file %s.\n%s\n",               status, hmmfile, errbuf);
-
-
-	/* read the .hmm file */
-	status = p7_hmmfile_Read(cfg.hfp, &cfg.abc, &cfg.hmm);
 
 	/* open the msa file */
+	/* alphabet should be set in function if not user-specified */
 	status = esl_msafile_Open(&(cfg.abc), alifile, NULL, eslMSAFILE_UNKNOWN, NULL, &cfg.afp);
 	if (status != eslOK) esl_msafile_OpenFailure(cfg.afp, status);
 
@@ -327,59 +289,20 @@ int main(int argc, char *argv[])
 	status = esl_msafile_Read(cfg.afp, &cfg.msa);
 	if (status != eslOK) esl_msafile_ReadFailure(cfg.afp, status);
 
+	/* Allow '.' as gap, too */
+	esl_alphabet_SetEquiv(cfg.abc, '.', '-');
+
+	/* read hpm file */
+	cfg.hpm = hpmfile_Read(hpmfile, cfg.abc, errbuf);
 
 	/* Set up the score set object */
 	cfg.hpm_ss = hpm_scoreset_Create(cfg.msa->nseq);
-
-	/* Set up potts model object */
-	//int L = 99;
-	//cfg.potts = potts_Create(L, cfg.abc);
-	cfg.potts = pottsfile_Read("../../data/Globins/PF00042_seed_consensus.rsc", cfg.abc, errbuf);
-
-
-	/* combine hmm and potts object to create hpm object */
-	cfg.hpm = hpm_Create_hmm_potts(cfg.hmm, cfg.potts, cfg.abc);
-	/* temporary N-mer hpm for testing, to be deleted */
-	//int M = 99; // for PF00042 seed
-	//cfg.hpm = hpm_Create(M, cfg.abc);
-
-	/* check that transition probabilities out of states are normalized */
-	int i;
-	//int a;
-
-
-	char *hpm_outfile = "test.hpm";
-	FILE *hpm_outfp 	= 	NULL;
-	if ((hpm_outfp = fopen(hpm_outfile, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpm_outfile);
-	hpmfile_Write(hpm_outfp, cfg.hpm);
-	fclose(hpm_outfp);
-	HPM *hpmr = NULL;
-	hpmr = hpmfile_Read("test.hpm", cfg.abc, errbuf);
-
-	char *hpm_outfile2 = "test2.hpm";
-	FILE *hpm_outfp2   = NULL;
-	if ((hpm_outfp2 = fopen(hpm_outfile2, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpm_outfile2);
-	hpmfile_Write(hpm_outfp2, hpmr);
-	fclose(hpm_outfp2);
-
-	/* check if file is being read, print line numbers */
-
-	/*
-	HPM *hpmDummy = NULL;
-	hpmDummy = hpmfile_ReadDummy("test.hpm", cfg.abc, errbuf);
-	*/
-
-
-	/* get traces for seqs in msa */
-
-	/* initiate empty trace array and match column array*/
-	P7_TRACE **tr = NULL;
-	int *matassign = NULL;
 
 	/* allocate memory for trace and match arrays */
 	ESL_ALLOC(tr, sizeof(P7_TRACE *) * cfg.msa->nseq);
 	ESL_ALLOC(matassign, sizeof(int) * (cfg.msa->alen + 1));
 
+	/* extract match states from alignment */
 	for (i=0; i < cfg.msa->alen; i++){
 		if (cfg.msa->rf[i] != '.') {
 			matassign[i+1] = 1;
@@ -393,18 +316,6 @@ int main(int argc, char *argv[])
 	/* assign traces to msa seqs */
 	p7_trace_FauxFromMSA(cfg.msa, matassign, p7_MSA_COORDS, tr);
 
-	/* now explore the newly created trace object */
-	/*
-	int z;
-	for (z=0; z < cfg.msa->nseq; z++) {
-		fprintf(stdout, "%d: %d %d %d %s\n", i, tr[z]->L, tr[z]->M, tr[z]->N, cfg.msa->sqname[z]);
-		fprintf(stdout, "\tj,i,k\n");
-		for (j = 0; j < tr[z]->N; j++) {
-			fprintf(stdout, "\t%d,%d,%d,%d\n", j, tr[z]->i[j],tr[z]->k[j],tr[z]->st[j]);
-			if (tr[z]->st[j] == 2) fprintf(stdout, "Match state!\n");
-		}
-	}
-	*/
 
 	/* Calculate hamiltonian for all sequences */
 	CalculateHamiltonian(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
@@ -413,34 +324,20 @@ int main(int argc, char *argv[])
 	/* Calculate transition probabilities for all seqs */
 	CalculateTransitionProbs(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 
-	/*
-	int n;
-	for (n=0; n < cfg.hpm_ss->nseq; n++){
-		fprintf(stdout, "%s: %f, %f, %f \n", cfg.hpm_ss->sqname[n], cfg.hpm_ss->E_potts[n], cfg.hpm_ss->lp_ins[n], cfg.hpm_ss->lp_trans[n]);
-
-	}
-	*/
 	/* write potts scores to outfile */
-	char *hpm_ss_outfile = "test_hpm_ss.csv";
-	FILE *hpm_ss_outfp   =  NULL;
-	if ((hpm_ss_outfp = fopen(hpm_ss_outfile, "w")) == NULL) esl_fatal("Failed to open output hpm score setfile %s for writing", hpm_ss_outfile);
+	if ((hpm_ss_fp = fopen(scorefile, "w")) == NULL) esl_fatal("Failed to open output hpm score setfile %s for writing", scorefile);
 
-	hpm_scoreset_Write(hpm_ss_outfp, cfg.hpm_ss);
-	fclose(hpm_ss_outfp);
+	hpm_scoreset_Write(hpm_ss_fp, cfg.hpm_ss);
+	fclose(hpm_ss_fp);
 
 	/* print hello world */
 	fprintf(stdout, "hello world!\n");
 
 	/* clean up */
 	esl_alphabet_Destroy(cfg.abc);
-	esl_sqfile_Close(cfg.sqfp);
-	esl_sq_Destroy(cfg.sq);
 	esl_msa_Destroy(cfg.msa);
 	esl_msafile_Close(cfg.afp);
-	p7_hmm_Destroy(cfg.hmm);
-
 	free(matassign);
-
 	p7_hmmfile_Close(cfg.hfp);
 	esl_getopts_Destroy(go);
 
