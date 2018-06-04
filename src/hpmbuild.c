@@ -28,9 +28,9 @@ static ESL_OPTIONS options[] = {
    { "-h",         eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL, NULL,            "help; show brief info on version and usage",              1 },
 
    /* Options forcing which alphabet we're working in (normally autodetected) */
-   { "--amino",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                   2 },
-   { "--dna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--rna",  "<seqfile> contains DNA sequences",                        2 },
-   { "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<seqfile> contains RNA sequences",                        2 },
+   { "--amino",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,"--dna,--rna",   "<pottsfile> and <hmmfile> are for protein sequences",                    2 },
+   { "--dna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--rna",  "<pottsfile> and <hmmfile> are for dna sequences",                        2 },
+   { "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<pottsfile> and <hmmfile> are for rna sequences",                        2 },
    { 0,0,0,0,0,0,0,0,0,0 },
 };
 static char usage[]  = "[-options] <hpmfile> <hmmfile> <pottsfile>";
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
 	fclose(hpm_outfp);
 	return 0;
 
-	ERROR:
-      return status;
+	//ERROR:
+   //   return status;
 
 }
