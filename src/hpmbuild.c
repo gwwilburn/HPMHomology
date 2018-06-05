@@ -31,6 +31,8 @@ static ESL_OPTIONS options[] = {
    { "--amino",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,"--dna,--rna",   "<pottsfile> and <hmmfile> are for protein sequences",                    2 },
    { "--dna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--rna",  "<pottsfile> and <hmmfile> are for dna sequences",                        2 },
    { "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<pottsfile> and <hmmfile> are for rna sequences",                        2 },
+	/* Option to create 3-mer dummy protein hpm */
+	{ "--3mer",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,NULL,             "create dummy 3-mer hpm, usage = [-options] <hpmfile>",                   3 },
    { 0,0,0,0,0,0,0,0,0,0 },
 };
 static char usage[]  = "[-options] <hpmfile> <hmmfile> <pottsfile>";
@@ -62,6 +64,28 @@ int main(int argc, char *argv[]) {
 	go = esl_getopts_Create(options);
    if (esl_opt_ProcessCmdline(go, argc, argv) != eslOK) cmdline_failure(argv[0], "Failed to parse command line: %s\n", go->errbuf);
    if (esl_opt_VerifyConfig(go)               != eslOK) cmdline_failure(argv[0], "Error in app configuration:   %s\n", go->errbuf);
+
+	/* check and see if we are making a dummy 3-mer model */
+	if       (esl_opt_GetBoolean(go, "--3mer")) {
+		/* we only want 1 argument */
+		if (esl_opt_ArgNumber(go)   != 1)     cmdline_failure(argv[0], "Incorrect number of command line arguments w/ dummy 3-mer hpm.\n", go->errbuf);
+		hpm_outfile    = esl_opt_GetArg(go, 1);
+
+		/* set alphabet to amino, forget what user says */
+		cfg.abc = esl_alphabet_Create(eslAMINO);
+
+		/* make 3-mer hpm*/
+		cfg.hpm = hpm_Create_3mer(cfg.abc);
+
+		/* write to output file */
+		/* open hpm outfile for writing, write hpm to it */
+   	if ((hpm_outfp = fopen(hpm_outfile, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpm_outfile);
+   	hpmfile_Write(hpm_outfp, cfg.hpm);
+
+		return 0;
+	}
+
+
 	if (esl_opt_ArgNumber(go)                  != 3)     cmdline_failure(argv[0], "Incorrect number of command line arguments.\n", go->errbuf);
 
 	hpm_outfile    = esl_opt_GetArg(go, 1);

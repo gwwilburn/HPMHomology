@@ -47,6 +47,7 @@ typedef struct hpmscoreset_s{
 /* hpm.c	*/
 extern HPM	         *hpm_Create(int M, ESL_ALPHABET *abc);
 extern HPM 				*hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc);
+extern HPM 				*hpm_Create_3mer(ESL_ALPHABET *abc);
 extern HPM_SCORESET	*hpm_scoreset_Create(int nseq);
 extern int				 hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_SS);
 extern int            IDX(int i, int j, int K);

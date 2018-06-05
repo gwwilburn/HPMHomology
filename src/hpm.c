@@ -165,6 +165,63 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 
 }
 
+HPM *
+hpm_Create_3mer(ESL_ALPHABET *abc) {
+	HPM    *hpm   = NULL;       /* hpm object to return      */
+	int     M     = 3;          /* number of nodes           */
+	int     i;                  /* site index                */
+	int 	  j;                  /* site index                */
+	int     a;                  /* alphabet index            */
+	int     b;                  /* alphabet index            */
+	int     idx;                /* alphabet index for eij's  */
+	int     idx2;               /* alphabet index for eij's  */
+	int     Kg    = abc->K+1;   /* alphabet size w/ gap      */
+	int     status;
+
+	/* allocate memory for hpm */
+   ESL_ALLOC(hpm, sizeof(HPM));
+
+   /* create hpm with 3 match states */
+   hpm = hpm_Create(M, abc);
+
+	/* set potts parameters */
+	for (i = 1; i < (M+1); i++) {
+		for(a = 0; a < Kg; a++) {
+			/* set all h_i's to 0 */
+			hpm->h[i][a] = 0;
+
+			/* set specific set of e_13's to be 1, else 0 */
+			for (j=i+1; j < (M+1); j++) {
+				for (b=0; b < Kg; b++) {
+					idx  = IDX(a,b,Kg);
+					idx2 = IDX(b,a,Kg);
+					if ( j == (i+1) && (a+b) == abc->K) {
+						hpm->e[i][j][idx]  = 1.0;
+						hpm->e[j][i][idx2] = 1.0;
+					}
+					else {
+						hpm->e[i][j][idx]  = 0.0;
+						hpm->e[j][i][idx2] = 0.0;
+					}
+				}
+			}
+		}
+	}
+
+	/* set transition parameters */
+	for (i = 0; i < M+1; i++) {
+		hpm->t[i][HPM_MM] = 1.0 - (0.1)*(i+1);
+		hpm->t[i][HPM_MI] = (0.1)*(i+1);
+		hpm->t[i][HPM_IM] = 1.0 - (0.15)*(i+1);
+		hpm->t[i][HPM_II] = (0.15)*(i+1);
+	}
+
+	return hpm;
+
+	ERROR:
+		return NULL;
+}
+
 HPM_SCORESET *
 hpm_scoreset_Create(int nseq)
 {
