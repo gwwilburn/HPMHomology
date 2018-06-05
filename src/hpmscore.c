@@ -71,7 +71,6 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 	/* loop over sequences */
 	for (n=0; n < msa->nseq; n++) {
-
 		E = 0.0;
 
 		/* print out sequence info */
@@ -79,13 +78,14 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 		/* loop over trace positions for this seq */
 		for (z = 0; z < tr[n]->N; z++) {
+			//fprintf(stdout, "z = %d, state = %d\n", z, tr[n]->st[z]);
 
 			/* check if we are in a match or delete state */
 			if (tr[n]->st[z] == 2 || tr[n]->st[z] == 6) {
 
 				i = tr[n]->k[z];
 
-				//fprintf(stdout, "\t %d\n", i);
+				//fprintf(stdout, "\t %d %d\n", i, tr[n]->st[z]);
 
 				/* we have a match position */
 				//if (tr[n]->st[z] == P7T_M ) {
@@ -98,6 +98,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 				else if (tr[n]->st[z] == 6) {
 					a = 20;
 				}
+				//fprintf(stdout, "\t%d, %d: %f\n", i,a,hpm->h[i][a]);
 				//fprintf(stdout, "h: i=%d, a=%d, h[i][a] = %.4f \n", i, a,  hpm->h[i][a]);
 				E = E + hpm->h[i][a];
 
@@ -110,18 +111,19 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 						 j = tr[n]->k[y];
 
 						/* we have a match state */
-						if (tr[n]->st[z] == 2) {
+						if (tr[n]->st[y] == 2) {
 							b =  msa->ax[n][tr[n]->i[y]];
 						}
 
 						/* we have a match position */
-						else if (tr[n]->st[z] == 6) {
+						else if (tr[n]->st[y] == 6) {
 							b = 20;
 						}
 
 						idx = IDX(a,b,msa->abc->K+1);
-						//fprintf(stdout, "\t\t %d %d, %d, %d, %d \n", i, j, idx, a, b);
+						//fprintf(stdout, "\t\t %d, %d, %d, %d \n", i, j, a, b);
 						E += hpm->e[i][j][idx];
+						//fprintf(stdout, "\t\t %f \n", hpm->e[i][j][idx]);
 
 					 }
 				}
@@ -294,7 +296,20 @@ int main(int argc, char *argv[])
 
 	/* read hpm file */
 	cfg.hpm = hpmfile_Read(hpmfile, cfg.abc, errbuf);
-
+	int j;
+	int a;
+	int b;
+	/*
+	for (i=1; i<cfg.hpm->M+1; i++){
+		for (j=i+1; j<cfg.hpm->M+1; j++) {
+			for (a=0; a<cfg.abc->K+1; a++) {
+				for (b=0; b<cfg.abc->K+1; b++) {
+					fprintf(stdout, "i = %d, j= %d, a = %d, b = %d, eij(ab) = %f\n", i,j,a,b,cfg.hpm->e[i][j][IDX(a,b,cfg.abc->K+1)]);
+				}
+			}
+		}
+	}
+	*/
 	/* Set up the score set object */
 	cfg.hpm_ss = hpm_scoreset_Create(cfg.msa->nseq);
 
