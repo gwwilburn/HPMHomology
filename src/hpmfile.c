@@ -21,7 +21,7 @@ int IsInt(char *str){
 
 		/* we allow '-' on the first character only */
 		if (i == 0) {
-			if ( (str[i] < 48 || str[i] > 57) && str[i] != 45) {
+			if ( (str[i] < 48 || str[i] > 57) && (str[i] != 45 || n == 1)) {
 				return 0;
 			}
 		}
@@ -265,11 +265,10 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
 					a = -1;
 					break;
 
-				} else {
-					if (tok_count > 0) {
-						ret_hpm->e[i][j][IDX(a,tok_count-1,abc->K+1)] = atof(tok);
-						ret_hpm->e[j][i][IDX(tok_count-1,a,abc->K+1)] = atof(tok);
-					}
+
+				} else if (tok_count > 0) {
+					ret_hpm->e[i][j][IDX(a,tok_count-1,abc->K+1)] = atof(tok);
+					ret_hpm->e[j][i][IDX(tok_count-1,a,abc->K+1)] = atof(tok);
 
 				}
 
