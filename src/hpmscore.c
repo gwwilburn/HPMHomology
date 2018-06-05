@@ -155,8 +155,8 @@ int CalculateInsertProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 
 			/* we have an insert position */
-			if (tr[n]->st[z] == 4) {
-				/* last match state */
+			if (tr[n]->st[z] == 4 || (tr[n]->st[z] == 8 && tr[n]->i[z] > 0 ) || ((tr[n]->st[z] == 13 && tr[n]->i[z] > 0 )) ) {
+				/* previous match state */
 				i = tr[n]->k[z];
 				/* residue */
 				a = msa->ax[n][tr[n]->i[z]];
@@ -185,28 +185,47 @@ int CalculateTransitionProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET
 
 	/* loop over sequences */
 	for (n=0; n < msa->nseq; n++) {
+		//fprintf(stdout, "%s\n", hpm_ss->sqname[n]);
 		lp = 0.0;
 		stprev = -1;
 		iprev = -1;
 
 		/* loop over trace positions for this seq */
       for (z = 0; z < tr[n]->N; z++) {
+			/* state type */
 			st = tr[n]->st[z];
+			/* node in model */
+			i = tr[n]->k[z];
 
 			/* handle begin state */
-			if ( st == 11) {
+			if ( st == 7) {
 				/* this is effectively the 0th match state */
 				stprev = 2;
 				iprev = 0;
 			}
 
-			/* we have an insert position */
-			if ( st == 2 || st == 4 || st == 6 || st == 12) {
+			/* handle inserts prior to first match state */
+			if (st == 8 && tr[n]->i[z] >0){
+				//fprintf(stdout, "\twe have an insert prior to the first match state!\n");
+				st = 4;
+				i = 0;
+			}
+
+			/* handle inserts between the last match state and end state */
+			if (st == 13 && tr[n]->i[z] >0 ) {
+				//fprintf(stdout, "\twe have an insert between the last match state and the state!\n");
+				st = 4;
+				i = hpm->M;
+			}
+			//fprintf(stdout, "\t%d: %d, %d, %d\n", z, tr[n]->st[z], tr[n]->k[z], tr[n]->i[z]);
+
+			if ( st == 2 || st == 4 || st == 6 || st == 15) {
 				/* match state */
-				i = tr[n]->k[z];
+				//fprintf(stdout, "\t\t%d %d, %d, %d\n", i, iprev, st, stprev);
+
 
 				/* current state is hybrid match-delete or end */
-				if (st == 2 || st == 6 || st == 12) {
+				if (st == 2 || st == 6 || st == 15) {
 
 					/* M->M transition */
 					if ( stprev == 2 || stprev == 6) {
@@ -232,6 +251,7 @@ int CalculateTransitionProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET
 					}
 				}
 				/* add log of prob ot this transition */
+				//fprintf(stdout, "\t\ti = %d, iprev = %d, trans = %d, hpm->[iprev][trans] =  %f\n", i,iprev,trans,hpm->t[iprev][trans]);
 				lp += log(hpm->t[iprev][trans]);
 				stprev = st;
 				iprev = i;
@@ -296,9 +316,9 @@ int main(int argc, char *argv[])
 
 	/* read hpm file */
 	cfg.hpm = hpmfile_Read(hpmfile, cfg.abc, errbuf);
-	int j;
-	int a;
-	int b;
+	//int j;
+	//int a;
+	//int b;
 	/*
 	for (i=1; i<cfg.hpm->M+1; i++){
 		for (j=i+1; j<cfg.hpm->M+1; j++) {
