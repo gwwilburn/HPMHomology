@@ -267,6 +267,36 @@ int CalculateTransitionProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET
 	return eslOK;
 }
 
+int CalculateMatchProbsNull(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
+	int     z;             /* index for trace elements 	      */
+	int     st;            /* state id index           	      */
+	int     n;				  /* sequence index                    */
+	int     a;				  /* residue index                     */
+	float   lp;            /* null model log prob               */
+
+	for (n=0; n < msa->nseq; n++) {
+		lp = 0;
+
+		/* loop over trace positions for this seq */
+      for (z = 0; z < tr[n]->N; z++) {
+			/* state type */
+			st = tr[n]->st[z];
+
+			if (st == 2) {
+				a = msa->ax[n][tr[n]->i[z]];
+				/* janky hack: just use 0th state insert emission prob */
+				lp = lp + log(hpm->ins[0][a]);
+			}
+		}
+		hpm_ss->lpnull_match[n] = lp;
+	}
+
+
+	return eslOK;
+
+
+}
+
 
 
 int main(int argc, char *argv[])
@@ -358,6 +388,8 @@ int main(int argc, char *argv[])
 	CalculateInsertProbs(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 	/* Calculate transition probabilities for all seqs */
 	CalculateTransitionProbs(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
+	/* Calculate match state null model probabilities for all seqs */
+	CalculateMatchProbsNull(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 
 	/* write potts scores to outfile */
 	if ((hpm_ss_fp = fopen(scorefile, "w")) == NULL) esl_fatal("Failed to open output hpm score setfile %s for writing", scorefile);
