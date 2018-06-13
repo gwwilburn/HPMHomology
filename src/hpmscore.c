@@ -174,21 +174,37 @@ int CalculateInsertProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 }
 
 int CalculateTransitionProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
-	int   z;            /* index for trace elements 	     */
-	int   st;           /* state id index           	     */
-	int   stprev;       /* state id index           	     */
-	int   trans;        /* transition id index       	     */
-	int   n;            /* sequence index            	     */
-	int   i;            /* match state index			        */
-	int   iprev;        /* match state index			        */
-	float lp;           /* log of insert emission probs     */
+	int   z;            /* index for trace elements 	             */
+	int   st;           /* state id index           	             */
+	int   stprev;       /* state id index           	             */
+	int   n;            /* sequence index            	             */
+	int   i;            /* match state index			                */
+	int   iprev;        /* match state index			                */
+	float lp;           /* log of transition probs                  */
+	float lp_NN;        /* log of N->N and C->C transition prob     */
+	float lp_NB;        /* log of N->B and C->T transition prob     */
+	int   L;            /* sequence length					             */
 
 	/* loop over sequences */
 	for (n=0; n < msa->nseq; n++) {
-		//fprintf(stdout, "%s\n", hpm_ss->sqname[n]);
+		L = 0;
 		lp = 0.0;
 		stprev = -1;
-		iprev = -1;
+
+		/* loop over alignment columns to determine how many residues are in seq */
+		/* is there a better way to do this???? */
+
+		for( i = 1; i < msa->alen+1; i++) {
+			if ( esl_abc_XIsGap(msa->abc, msa->ax[n][i]) == 0) {
+				L++;
+			}
+		}
+
+		/* calculate N->N and C->C transition probability, in log space */
+	   lp_NN = log(L) - log(L+2);
+		/* calculate N->B and C->T transition probability, in log space */
+		lp_NB = log(2) - log(L+2);
+
 
 		/* loop over trace positions for this seq */
       for (z = 0; z < tr[n]->N; z++) {
@@ -197,70 +213,73 @@ int CalculateTransitionProbs(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET
 			/* node in model */
 			i = tr[n]->k[z];
 
-			/* handle begin state */
-			if ( st == 7) {
-				/* this is effectively the 0th match state */
-				stprev = 2;
-				iprev = 0;
+			/* handle transitions into N state */
+			if (st == 8) {
+
+				/*ignore S->N transitions, they have prob 1 */
+
+				/* handle N->N transitions */
+				if (stprev == 8) {
+					lp += lp_NN;
+				}
 			}
+			/* handle transitions into B state */
+			else if (st == 9) {
 
-			/* handle inserts prior to first match state */
-			if (st == 8 && tr[n]->i[z] >0){
-				//fprintf(stdout, "\twe have an insert prior to the first match state!\n");
-				st = 4;
-				i = 0;
+				/* handle N->B transitons */
+				if (stprev == 8) {
+					lp += lp_NB;
+				}
+				/* no other transitions into B state possible */
 			}
+			/* handle transitions into hybrid match-del states */
+			else if (st == 2 || st == 6) {
 
-			/* handle inserts between the last match state and end state */
-			if (st == 13 && tr[n]->i[z] >0 ) {
-				//fprintf(stdout, "\twe have an insert between the last match state and the state!\n");
-				st = 4;
-				i = hpm->M;
+				/* handle M->M transitions */
+				if (stprev == 2 || stprev == 6) {
+
+					lp += log(hpm->t[iprev][HPM_MM]);
+				}
+				/* handle I->M transitions */
+				else if (stprev == 4) {
+					lp += log(hpm->t[iprev][HPM_IM]);
+				}
+				/* ignore B->M transitions, they have prob 1 */
 			}
-			//fprintf(stdout, "\t%d: %d, %d, %d\n", z, tr[n]->st[z], tr[n]->k[z], tr[n]->i[z]);
-
-			if ( st == 2 || st == 4 || st == 6 || st == 15) {
-				/* match state */
-				//fprintf(stdout, "\t\t%d %d, %d, %d\n", i, iprev, st, stprev);
-
-
-				/* current state is hybrid match-delete or end */
-				if (st == 2 || st == 6 || st == 15) {
-
-					/* M->M transition */
-					if ( stprev == 2 || stprev == 6) {
-						trans = HPM_MM;
-					}
-
-					/* I->M transition */
-					if ( stprev == 4) {
-						trans = HPM_IM;
-					}
+			/* handle transitions into I states */
+			else if (st == 4) {
+				/* handle M->I transitions */
+				if (stprev == 2 || stprev == 6) {
+					lp += log(hpm->t[iprev][HPM_MI]);
+				}
+				/* handle I->I transitions */
+				else if (stprev == 4) {
+					lp += log(hpm->t[iprev][HPM_II]);
 				}
 
-				/* current state is an insert state */
-				else if (st == 4) {
-					/* M->I transition */
-					if ( stprev == 2 || stprev == 6) {
-						trans = HPM_MI;
-					}
-
-					/* I->I transition */
-					if ( stprev == 4) {
-						trans = HPM_II;
-					}
-				}
-				/* add log of prob ot this transition */
-				//fprintf(stdout, "\t\ti = %d, iprev = %d, trans = %d, hpm->[iprev][trans] =  %f\n", i,iprev,trans,hpm->t[iprev][trans]);
-				lp += log(hpm->t[iprev][trans]);
-				stprev = st;
-				iprev = i;
 			}
+
+			/* handle transitions into C state */
+			else if (st == 13) {
+				if (stprev == 13) {
+					lp += lp_NN;
+				}
+				/* ignore E->C transitions, they have prob 1 */
+			}
+			/*handle transitions into T state */
+			else if (st == 15) {
+				if (stprev == 13) {
+					lp += lp_NB;
+				}
+				/* no other possible transitions to T state */
+			}
+
+			stprev = st;
+			iprev = i;
 		}
 
 		/* add this seq's transition prob to score set */
 		hpm_ss->lp_trans[n] = lp;
-
 	}
 
 
