@@ -263,16 +263,17 @@ hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_ss){
 
 	/* write csv header line */
 
-	fprintf(fp,"id,hamiltonian,lp_ins,lp_trans,lpnull_match\n");
+	fprintf(fp,"id,hamiltonian,lp_ins,lp_trans,lpnull_match,logodds_unnormalized\n");
 
 	/* loop over sequences, print id and scores */
 	for (n = 0; n < hpm_ss->nseq; n++) {
-		fprintf(fp, "%s,%.4f,%.4f,%.4f,%.4f\n",
+		fprintf(fp, "%s,%.4f,%.4f,%.4f,%.4f,%.4f\n",
 				  hpm_ss->sqname[n],
 				  hpm_ss->E_potts[n],
 				  hpm_ss->lp_ins[n],
 				  hpm_ss->lp_trans[n],
-				  hpm_ss->lpnull_match[n]);
+				  hpm_ss->lpnull_match[n],
+				  hpm_ss->E_potts[n] + hpm_ss->lp_trans[n] - hpm_ss->lpnull_match[n]);
 
 	}
 
