@@ -14,13 +14,16 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile potts pottsfile hpmscore hpmbuild
+all: hpm hpmfile potts pottsfile hpmscore hpmbuild hmmscore_uniglocal
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.c hpmfile.c potts.c pottsfile.c
 
 hpmbuild: hpmbuild.c
 	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.c hpmfile.c potts.c pottsfile.c
+
+hmmscore_uniglocal: hmmscore_uniglocal.c
+	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
