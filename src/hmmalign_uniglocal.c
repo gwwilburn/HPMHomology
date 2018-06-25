@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	ESL_REALLOC(tr, sizeof(P7_TRACE *) * totseq);
 
 	for (i = 0; i < totseq; i++) {
-		tr[i] = p7_trace_CreateWithPP();
+		tr[i] = p7_trace_Create();
 	}
 
 	/* Configure a profile from the HMM */
