@@ -14,7 +14,7 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile potts pottsfile hpmscore hpmbuild hmmscore_uniglocal
+all: hpm hpmfile potts pottsfile hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.c hpmfile.c potts.c pottsfile.c
@@ -24,6 +24,9 @@ hpmbuild: hpmbuild.c
 
 hmmscore_uniglocal: hmmscore_uniglocal.c
 	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c
+
+hmmalign_uniglocal: hmmalign_uniglocal.c
+	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
@@ -40,6 +43,6 @@ pottsfile: pottsfile.c
 
 
 clean:
-	rm -f hpmscore hpmbuild hpm.o hpmfile.o potts.o pottsfile.o
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o potts.o pottsfile.o
 
 .PHONY: all clean
