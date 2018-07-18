@@ -33,8 +33,11 @@ int main(int argc, char **argv) {
 	P7_REFMX       *fwd     = p7_refmx_Create(100, 100);
 	P7_REFMX       *bck     = p7_refmx_Create(100, 100);
 	P7_REFMX       *pp      = p7_refmx_Create(100, 100);
+	P7_REFMX       *vit     = p7_refmx_Create(200, 400); /* will grow as needed                   */
+	P7_TRACE       *tr      = p7_trace_Create();;
 	float           fsc;
 	float           bsc;
+	float           vsc;
 	float           nullsc;
 	int             format  = eslSQFILE_UNKNOWN;
 	int             status;
@@ -64,7 +67,7 @@ int main(int argc, char **argv) {
 	if (p7_profile_ConfigUniglocal(gm, hmm, bg, sq->n) != eslOK) esl_fatal("failed to configure profile");
 
 	/* print header to .csv output */
-	fprintf(stdout, "id, fwd (raw), bck (raw), fwd (bits), bck (bits)\n");
+	fprintf(stdout, "id,vit_(raw),fwd_(raw),bck_(raw),bit_(bits),fwd_(bits),bck_(bits)\n");
 
 	/* loop through sequences */
 
@@ -89,19 +92,27 @@ int main(int argc, char **argv) {
 		 /* Those scores are partial log-odds likelihoods in nats.
        * Subtract off the rest of the null model, convert to bits.
        */
-      p7_bg_NullOne(bg, sq->dsq, sq->n, &nullsc);
+
+		/* Run Viterbi - get raw score and optimal trace */
+      p7_ReferenceViterbi(sq->dsq, sq->n, gm, vit, tr, &vsc);
+
+		/* Subtract off the rest of the null model, convert to bits.*/
+		p7_bg_NullOne(bg, sq->dsq, sq->n, &nullsc);
 
 		/* print out scores */
-		fprintf(stdout, "%s,%10.4f,%10.4f,%10.4f,%10.4f\n",
+		fprintf(stdout, "%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n",
 			  	  sq->name,
+				  vsc,
 			  	  fsc,
 				  bsc,
+				  (vsc - nullsc) / eslCONST_LOG2,
 			     (fsc - nullsc) / eslCONST_LOG2,
 			     (bsc - nullsc) / eslCONST_LOG2);
 
 		/* prepare objects for next iteration */
 		p7_refmx_Reuse(fwd);
 		p7_refmx_Reuse(bck);
+		p7_refmx_Reuse(vit);
 		p7_refmx_Reuse(pp);
 		esl_sq_Reuse(sq);
 	}
@@ -115,7 +126,9 @@ int main(int argc, char **argv) {
    p7_refmx_Destroy(pp);
    p7_refmx_Destroy(fwd);
    p7_refmx_Destroy(bck);
+   p7_refmx_Destroy(vit);
    p7_profile_Destroy(gm);
+	free(tr);
    p7_bg_Destroy(bg);
 	esl_getopts_Destroy(go);
 
