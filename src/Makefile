@@ -14,16 +14,16 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile potts pottsfile hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal
+all: hpm hpmfile potts pottsfile hpmscore hpmbuild hmm_scoreset hmmscore_uniglocal hmmalign_uniglocal
 
 hpmscore: hpmscore.c
-	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.c hpmfile.c potts.c pottsfile.c
+	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o potts.o pottsfile.o
 
 hpmbuild: hpmbuild.c
-	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.c hpmfile.c potts.c pottsfile.c
+	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.o hpmfile.o potts.o pottsfile.o
 
 hmmscore_uniglocal: hmmscore_uniglocal.c
-	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c
+	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c hmm_scoreset.o
 
 hmmalign_uniglocal: hmmalign_uniglocal.c
 	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c
@@ -39,6 +39,11 @@ potts: potts.c
 
 pottsfile: pottsfile.c
 	${CC} ${CFLAGS} -c -o pottsfile.o ${IFLAGS} pottsfile.c
+
+hmm_scoreset: hmm_scoreset.c
+	${CC} ${CFLAGS} -c -o hmm_scoreset.o ${IFLAGS} hmm_scoreset.c
+
+
 
 
 
