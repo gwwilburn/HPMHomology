@@ -15,15 +15,16 @@ static ESL_OPTIONS options[] = {
   { "-h",        eslARG_NONE,   FALSE, NULL, NULL,   NULL,  NULL, NULL, "show brief help on version and usage",             0 },
   {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
-static char usage[]  = "[-options] <hmmfile> <seqfile>";
+static char usage[]  = "[-options] <hmmfile> <seqfile> <msafile>";
 static char banner[] = "simple program to produce a uniglocal alignment to an hmm";
 
 int
 main(int argc, char **argv)
 {
-	ESL_GETOPTS    *go      = p7_CreateDefaultApp(options, 2, argc, argv, banner, usage);
+	ESL_GETOPTS    *go      = p7_CreateDefaultApp(options, 3, argc, argv, banner, usage);
 	char           *hmmfile = esl_opt_GetArg(go, 1);
  	char           *seqfile = esl_opt_GetArg(go, 2);
+ 	char           *msafile = esl_opt_GetArg(go, 3);
  	ESL_ALPHABET   *abc     = NULL;
  	P7_HMMFILE     *hfp     = NULL;
 	P7_HMM         *hmm     = NULL;
@@ -34,6 +35,7 @@ main(int argc, char **argv)
 	P7_REFMX       *vit     = p7_refmx_Create(200, 400); /* will grow as needed                   */
 	P7_TRACE      **tr      = NULL;
 	ESL_MSA        *msa     = NULL;	                    /* resulting multiple alignment          */
+	FILE           *afp     = NULL;	                    /* output alignment file                 */
 	int             outfmt  = eslMSAFILE_STOCKHOLM;
 	float           vsc;                                 /* viterbi score                         */
 	int             totseq  = 0;
@@ -105,8 +107,10 @@ main(int argc, char **argv)
 	msaopts |= p7_ALL_CONSENSUS_COLS; /* include all consensus columns in alignment */
 	p7_tracealign_Seqs(sq, tr, totseq, hmm->M, msaopts, hmm, &msa);
 
-	/* write MSA to stdout */
-	esl_msafile_Write(stdout, msa, outfmt);
+	/* write MSA to file*/
+	if ((afp = fopen(msafile, "w")) == NULL) esl_fatal("Failed to open output msafile %s for writing", msafile);
+	esl_msafile_Write(afp, msa, outfmt);
+	fclose(afp);
 
 	/* clean up and return */
  	p7_hmm_Destroy(hmm);
