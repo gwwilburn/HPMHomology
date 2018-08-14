@@ -35,22 +35,11 @@ typedef struct hpm_s{
 
 } HPM;
 
-typedef struct hpmscoreset_s{
-	char   **sqname;        /* sequence names [0..nseq-1][], \0-terminated            */
-	int 		nseq;          /* number of sequences                                    */
-	float   *E_potts;       /* Potts pseudo-energies [0...nseq-1]                     */
-	float   *lp_ins;        /* product of insertion probabilities [0...nseq-1]        */
-	float   *lp_trans;      /* product of transition probabilities [0...nseq-1]       */
-	float   *lpnull_match;  /* null model probabilities of match states [0...nseq-1]  */
-
-} HPM_SCORESET;
 
 /* hpm.c	*/
 extern HPM	         *hpm_Create(int M, ESL_ALPHABET *abc);
 extern HPM 				*hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc);
 extern HPM 				*hpm_Create_3mer(ESL_ALPHABET *abc);
-extern HPM_SCORESET	*hpm_scoreset_Create(int nseq);
-extern int				 hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_SS);
 extern int            IDX(int i, int j, int K);
 
 

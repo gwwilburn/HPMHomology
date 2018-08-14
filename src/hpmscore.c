@@ -17,6 +17,7 @@
 
 #include "hpm.h"
 #include "hpmfile.h"
+#include "hpm_scoreset.h"
 #include "potts.h"
 #include "pottsfile.h"
 
@@ -56,22 +57,24 @@ cmdline_failure(char *argv0, char *format, ...)
 }
 
 int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
-	int   z;    /* index for trace elements 	     */
-	int   y;    /* index for trace elements 	     */
-	int   n;    /* sequence index          	     */
-	int   i;    /* match state index			        */
-	int   j;    /* match state index	    		     */
-	int   a;    /* residue index            	     */
-	int   b;    /* residue index           	     */
-	int   idx;  /* index for potts parameters      */
-	float E;    /* pseudo-energy, aka Hamiltonian  */
+	int   z;     /* index for trace elements 	               */
+	int   y;     /* index for trace elements 	               */
+	int   n;     /* sequence index          	               */
+	int   i;     /* match state index			               */
+	int   j;     /* match state index	    		            */
+	int   a;     /* residue index            	               */
+	int   b;     /* residue index                            */
+	int   idx;   /* index for potts parameters               */
+	float E_hi;  /* pseudo-energy contribution from h_i's    */
+	float E_eij; /* pseudo-energy contribution from e_ij's   */
 
 	/* copy over sqname */
 	hpm_ss->sqname = msa->sqname;
 
 	/* loop over sequences */
 	for (n=0; n < msa->nseq; n++) {
-		E = 0.0;
+		E_hi = 0.0;
+		E_eij = 0.0;
 
 		/* print out sequence info */
 		//fprintf(stdout, "%d: %d %d %d %s\n", z, tr[n]->L, tr[n]->M, tr[n]->N, hpm_ss->sqname[n]);
@@ -100,7 +103,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 				}
 				//fprintf(stdout, "\t%d, %d: %f\n", i,a,hpm->h[i][a]);
 				//fprintf(stdout, "h: i=%d, a=%d, h[i][a] = %.4f \n", i, a,  hpm->h[i][a]);
-				E = E + hpm->h[i][a];
+				E_hi = E_hi + hpm->h[i][a];
 
 				/* now add e_ij terms to pseudo-energy */
 				for (y = z+1; y < tr[n]->N; y++) {
@@ -122,7 +125,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 						idx = IDX(a,b,msa->abc->K+1);
 						//fprintf(stdout, "\t\t %d, %d, %d, %d \n", i, j, a, b);
-						E += hpm->e[i][j][idx];
+						E_eij += hpm->e[i][j][idx];
 						//fprintf(stdout, "\t\t %f \n", hpm->e[i][j][idx]);
 
 					 }
@@ -130,8 +133,8 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 			}
 
 		}
-		hpm_ss->E_potts[n] = E;
-		//fprintf(stdout, "E: %.6f\n", hpm_ss->E_potts[n]);
+		hpm_ss->E_hi[n] = E_hi;
+		hpm_ss->E_eij[n] = E_eij;
 	}
 
 
