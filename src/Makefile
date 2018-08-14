@@ -14,10 +14,10 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile potts pottsfile hpmscore hpmbuild hmm_scoreset hmmscore_uniglocal hmmalign_uniglocal
+all: hpm hpmfile hpm_scoreset potts pottsfile hpmscore hpmbuild hmm_scoreset hmmscore_uniglocal hmmalign_uniglocal
 
 hpmscore: hpmscore.c
-	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o potts.o pottsfile.o
+	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o
 
 hpmbuild: hpmbuild.c
 	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.o hpmfile.o potts.o pottsfile.o
@@ -34,6 +34,9 @@ hpm: hpm.c
 hpmfile: hpmfile.c
 	${CC} ${CFLAGS} -c -o hpmfile.o ${IFLAGS} hpmfile.c
 
+hpm_scoreset: hpm_scoreset.c
+	${CC} ${CFLAGS} -c -o hpm_scoreset.o ${IFLAGS} hpm_scoreset.c
+
 potts: potts.c
 	${CC} ${CFLAGS} -c -o potts.o ${IFLAGS} potts.c
 
@@ -44,10 +47,7 @@ hmm_scoreset: hmm_scoreset.c
 	${CC} ${CFLAGS} -c -o hmm_scoreset.o ${IFLAGS} hmm_scoreset.c
 
 
-
-
-
 clean:
-	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o potts.o pottsfile.o
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o
 
 .PHONY: all clean
