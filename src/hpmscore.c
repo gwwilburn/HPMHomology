@@ -37,7 +37,7 @@ static ESL_OPTIONS options[] = {
 	{ "-h",         eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL, NULL,            "help; show brief info on version and usage",              1 },
 
 	/* Options forcing which alphabet we're working in (normally autodetected) */
-	{ "--amino",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                    2 },
+	{ "--amino",  eslARG_NONE,  FALSE,  NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                   2 },
 	{ "--dna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--rna",  "<seqfile> contains DNA sequences",                        2 },
 	{ "--rna",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--amino,--dna",  "<seqfile> contains RNA sequences",                        2 },
 	{ 0,0,0,0,0,0,0,0,0,0 },
@@ -68,6 +68,10 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 	float E_hi;  /* pseudo-energy contribution from h_i's    */
 	float E_eij; /* pseudo-energy contribution from e_ij's   */
 
+
+	/* get alphabet size */
+	int K = msa->abc->K;
+
 	/* copy over sqname */
 	hpm_ss->sqname = msa->sqname;
 
@@ -88,20 +92,24 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 				i = tr[n]->k[z];
 
-				//fprintf(stdout, "\t %d %d\n", i, tr[n]->st[z]);
+				//fprintf(stdout, "\t %d %d %d\n", i, tr[n]->st[z], tr[n]->k[z]);
 
 				/* we have a match position */
 				//if (tr[n]->st[z] == P7T_M ) {
 				if (tr[n]->st[z] == 2) {
 					a = msa->ax[n][tr[n]->i[z]];
+					
+					/* treat non-canonical characters as gaps */
+					if (a > K) {
+						a = K;
+					}
 				}
 
 				/* we have a delete position */
 				//else if ( tr[n]->st[z] == p7T_D ) {
 				else if (tr[n]->st[z] == 6) {
-					a = 20;
+					a = K;
 				}
-				//fprintf(stdout, "\t%d, %d: %f\n", i,a,hpm->h[i][a]);
 				//fprintf(stdout, "h: i=%d, a=%d, h[i][a] = %.4f \n", i, a,  hpm->h[i][a]);
 				E_hi = E_hi + hpm->h[i][a];
 
