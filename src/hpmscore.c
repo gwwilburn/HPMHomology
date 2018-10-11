@@ -81,7 +81,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 		E_eij = 0.0;
 
 		/* print out sequence info */
-		//fprintf(stdout, "%d: %d %d %d %s\n", z, tr[n]->L, tr[n]->M, tr[n]->N, hpm_ss->sqname[n]);
+		// fprintf(stdout, "%d: %d %d %d %s\n", z, tr[n]->L, tr[n]->M, tr[n]->N, hpm_ss->sqname[n]);
 
 		/* loop over trace positions for this seq */
 		for (z = 0; z < tr[n]->N; z++) {
@@ -110,7 +110,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 				else if (tr[n]->st[z] == 6) {
 					a = K;
 				}
-				//fprintf(stdout, "h: i=%d, a=%d, h[i][a] = %.4f \n", i, a,  hpm->h[i][a]);
+				// fprintf(stdout, "h: i=%d, a=%d, h[i][a] = %.4f \n", i, a,  hpm->h[i][a]);
 				E_hi = E_hi + hpm->h[i][a];
 
 				/* now add e_ij terms to pseudo-energy */
@@ -128,13 +128,13 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 
 						/* we have a match position */
 						else if (tr[n]->st[y] == 6) {
-							b = 20;
+							b = K;
 						}
 
 						idx = IDX(a,b,msa->abc->K+1);
-						//fprintf(stdout, "\t\t %d, %d, %d, %d \n", i, j, a, b);
+						// fprintf(stdout, "\t\t %d, %d, %d, %d \n", i, j, a, b);
 						E_eij += hpm->e[i][j][idx];
-						//fprintf(stdout, "\t\t %f \n", hpm->e[i][j][idx]);
+ 						// fprintf(stdout, "\t\t %f \n", hpm->e[i][j][idx]);
 
 					 }
 				}
