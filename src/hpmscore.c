@@ -84,6 +84,8 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 		// fprintf(stdout, "%d: %d %d %d %s\n", z, tr[n]->L, tr[n]->M, tr[n]->N, hpm_ss->sqname[n]);
 
 		/* loop over trace positions for this seq */
+		//fprintf(stdout, "%s\n", msa->sqname[n]);
+
 		for (z = 0; z < tr[n]->N; z++) {
 			//fprintf(stdout, "z = %d, state = %d\n", z, tr[n]->st[z]);
 
@@ -98,7 +100,7 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 				//if (tr[n]->st[z] == P7T_M ) {
 				if (tr[n]->st[z] == 2) {
 					a = msa->ax[n][tr[n]->i[z]];
-					
+
 					/* treat non-canonical characters as gaps */
 					if (a > K) {
 						a = K;
@@ -119,22 +121,26 @@ int CalculateHamiltonian(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET *hp
 					/* check if we are in a match position */
 					 if (tr[n]->st[y] == 2 || tr[n]->st[y] == 6) {
 
+
 						 j = tr[n]->k[y];
 
 						/* we have a match state */
 						if (tr[n]->st[y] == 2) {
 							b =  msa->ax[n][tr[n]->i[y]];
+
+							/* treat non-canonical characters as gaps */
+							 if (b > K) {
+								 b = K;
+							 }
 						}
 
-						/* we have a match position */
+						/* we have a delete position */
 						else if (tr[n]->st[y] == 6) {
 							b = K;
 						}
 
 						idx = IDX(a,b,msa->abc->K+1);
-						// fprintf(stdout, "\t\t %d, %d, %d, %d \n", i, j, a, b);
 						E_eij += hpm->e[i][j][idx];
- 						// fprintf(stdout, "\t\t %f \n", hpm->e[i][j][idx]);
 
 					 }
 				}
