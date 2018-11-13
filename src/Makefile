@@ -6,7 +6,8 @@ HMMERDIR = ../lib/hmmer/src
 INCLUDES = -I${HMMERDIR} -I${ESLDIR}
 IFLAGS   = -I${ESLDIR} -I${HMMERDIR} -I../src
 LFLAGS   = -L${ESLDIR} -L${HMMERDIR} -L../src
-LIBS     = -leasel     -lm -lhmmer
+LIBS     = -lm
+SLIBS    = ${HMMERDIR}/libhmmer.a ${ESLDIR}/libeasel.a
 
 #compiler information
 CC = gcc
@@ -14,19 +15,22 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile hpm_scoreset potts pottsfile hpmscore hpmbuild hmm_scoreset hmmscore_uniglocal hmmalign_uniglocal
+all: hpm hpmfile hpm_scoreset potts pottsfile hpmscore hpmbuild hmm_scoreset hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS
 
 hpmscore: hpmscore.c
-	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o
+	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
 
 hpmbuild: hpmbuild.c
-	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.o hpmfile.o potts.o pottsfile.o
+	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.o hpmfile.o potts.o pottsfile.o ${SLIBS}
 
 hmmscore_uniglocal: hmmscore_uniglocal.c
-	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c hmm_scoreset.o
+	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c hmm_scoreset.o ${SLIBS}
 
 hmmalign_uniglocal: hmmalign_uniglocal.c
-	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c
+	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c ${SLIBS}
+
+hpmscoreIS: hpmscoreIS.c
+	${CC} ${CFLAGS} -o hpmscoreIS ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
