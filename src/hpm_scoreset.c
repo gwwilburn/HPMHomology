@@ -27,6 +27,7 @@ hpm_scoreset_Create(int nseq)
 	ESL_ALLOC(hpm_ss->lp_ins,       sizeof(float) * nseq);
 	ESL_ALLOC(hpm_ss->lp_trans,     sizeof(float) * nseq);
 	ESL_ALLOC(hpm_ss->lpnull_match, sizeof(float) * nseq);
+	ESL_ALLOC(hpm_ss->lpnull_trans, sizeof(float) * nseq);
 
 	for (n = 0; n < nseq; n++) {
 		hpm_ss->E_hi[n]         = 0.0;
@@ -34,6 +35,7 @@ hpm_scoreset_Create(int nseq)
 		hpm_ss->lp_ins[n]       = 0.0;
 		hpm_ss->lp_trans[n]     = 0.0;
 		hpm_ss->lpnull_match[n] = 0.0;
+		hpm_ss->lpnull_trans[n] = 0.0;
 	}
 
 	return hpm_ss;
@@ -49,11 +51,11 @@ hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_ss){
 
 	/* write csv header line */
 
-	fprintf(fp,"id,E_hi,E_eij,hamiltonian,lp_ins,lp_trans,lpnull_match,logodds_unnormalized\n");
+	fprintf(fp,"id,E_hi,E_eij,hamiltonian,lp_ins,lp_trans,lpnull_match,lpnull_trans,logodds_unnormalized\n");
 
 	/* loop over sequences, print id and scores */
 	for (n = 0; n < hpm_ss->nseq; n++) {
-		fprintf(fp, "%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n",
+		fprintf(fp, "%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n",
 				  hpm_ss->sqname[n],
 				  hpm_ss->E_hi[n],
 				  hpm_ss->E_eij[n],
@@ -61,7 +63,8 @@ hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_ss){
 				  hpm_ss->lp_ins[n],
 				  hpm_ss->lp_trans[n],
 				  hpm_ss->lpnull_match[n],
-				  hpm_ss->E_hi[n] + hpm_ss->E_eij[n] + hpm_ss->lp_trans[n] - hpm_ss->lpnull_match[n]);
+				  hpm_ss->lpnull_trans[n],
+				  hpm_ss->E_hi[n] + hpm_ss->E_eij[n] + hpm_ss->lp_trans[n] - hpm_ss->lpnull_match[n] - hpm_ss->lpnull_trans[n]);
 
 	}
 

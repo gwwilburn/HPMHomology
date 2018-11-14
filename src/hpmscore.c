@@ -333,6 +333,39 @@ int CalculateMatchProbsNull(HPM *hpm, P7_TRACE **tr, ESL_MSA *msa, HPM_SCORESET 
 
 }
 
+int CalculateTransitionProbsNull(ESL_MSA *msa, HPM_SCORESET *hpm_ss) {
+	P7_BG  *bg  = NULL;
+	int     n;           /* sequence index       */
+	int     i;           /* position index       */
+	int     L;           /* sequence length      */
+	float   lp;          /* null model lot prob  */
+
+	bg = p7_bg_Create(msa->abc);
+
+	for (n=0; n < msa->nseq; n++) {
+		/* loop over alignment columns to determine how many residues are in seq */
+		/* is there a better way to do this???? */
+		L = 0;
+		for( i = 1; i < msa->alen+1; i++) {
+			if ( esl_abc_XIsGap(msa->abc, msa->ax[n][i]) == 0) L++;
+		}
+
+		/* Set the null model's target length models */
+		p7_bg_SetLength(bg, L);
+		lp = 0.0;
+		/* calculate log prob of null transitions */
+		p7_bg_NullOne(bg, msa->ax[n], L, &lp);
+		/* add above value to scoreset object */
+		hpm_ss->lpnull_trans[n] = lp;
+
+	}
+
+	/* clean up */
+	p7_bg_Destroy(bg);
+
+	return eslOK;
+
+}
 
 
 int main(int argc, char *argv[])
@@ -426,6 +459,8 @@ int main(int argc, char *argv[])
 	CalculateTransitionProbs(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
 	/* Calculate match state null model probabilities for all seqs */
 	CalculateMatchProbsNull(cfg.hpm, tr, cfg.msa, cfg.hpm_ss);
+	/* calculate null transition probababilities for all sequences */
+	CalculateTransitionProbsNull(cfg.msa, cfg.hpm_ss);
 
 	/* write potts scores to outfile */
 	if ((hpm_ss_fp = fopen(scorefile, "w")) == NULL) esl_fatal("Failed to open output hpm score setfile %s for writing", scorefile);
