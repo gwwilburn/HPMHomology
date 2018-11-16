@@ -7,6 +7,7 @@
 #include "esl_alphabet.h"
 #include "esl_sq.h"
 #include "esl_sqio.h"
+#include "esl_vectorops.h"
 #include "hpm.h"
 #include "hpmfile.h"
 #include "hpmscoreIS.h"
@@ -52,7 +53,6 @@ int main(int argc, char **argv){
 	int             format    = eslSQFILE_UNKNOWN;
 	int             totseq    = 0;
 	int             nseq      = 0;
-	int             i;
 
 	int             status;
 	char            errbuf[eslERRBUFSIZE];
@@ -124,17 +124,22 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 	P7_REFMX       *fwd       = p7_refmx_Create(100, 100);
 	P7_TRACE       *tr        = p7_trace_Create();
-	float           fsc;
+	float           fsc_ld;                                 /* partial forward log odds score; output *
+																				* calculated in p7_ReferenceForward()    */
 	float          *wrk       = NULL;
 
 	int             i;
 	int             r;                                      /* importance sample index                */
-	int             R         = 1;                          /* total number of samples per sequence   */
-	float           sc;   				                       /* ln( Q( x, \pi) ) under an hpm          */
+	int             R         = 10000;                         /* total number of samples per sequence   */
+	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
 	float           hsc;
 	float           esc;
-	float           isc;
+	float           nesc;
+	float           nmesc;
+	float           ntsc;
 	float           tsc;
+	double          pr[R];
+
 
 	/* create a profile from the HMM */
 	gm = p7_profile_Create(hmm->M, hmm->abc);
@@ -143,8 +148,6 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	/* configure model in uniglocal mode */
 	if (p7_profile_ConfigUniglocal(gm, hmm, bg, 400) != eslOK) esl_fatal("failed to configure profile");
 
-
-	fprintf(stdout, "tot seq: %d\n", totseq);
 	/* outer loop over all sequences in seqfile */
 	//for (i = 0; i < totseq; i++) {
 	for (i = 0; i < 1; i++) {
@@ -152,34 +155,46 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 
 		/* Set the profile and null model's target length models */
-		p7_bg_SetLength     (bg, sq[i]->n);
 		p7_profile_SetLength(gm, sq[i]->n);
 
 		/* calculate forward dp matrix, forward score */
-		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
- 		fprintf(stdout, "%s: %.2f\n", sq[i]->name, fsc);
+		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc_ld);
 
+		/* calculate null emission scores */
+		hpmscore_ScoreNullEmissions(hpm, sq[i], &nesc);
+
+		/* calculate null transition scores */
+		hpmscore_ScoreNullTransitions(hpm, sq[i], bg, &ntsc);
 
 		/* inner loop over sampled paths */
 		for (r = 0; r < R; r++) {
-			fprintf(stdout, "%d %d\n", i, r);
+			fprintf(stdout, "%d\n", r);
+
 			/* perform stochastic traceback */
 			p7_reference_trace_Stochastic(rng, &wrk, gm, fwd, tr);
 			/* Calculate Q(x,\pi) under hmm */
-			p7_trace_Score(tr, sq[i]->dsq, gm, &sc);
+			p7_trace_Score(tr, sq[i]->dsq, gm, &sc_ld);
 			/* calculate Potts Hamiltonian */
 			hpmscore_CalculateHamiltonian(hpm, tr, sq[i]->dsq, &hsc, &esc);
-			/* score insert emissions */
-			hpmscore_ScoreInsertions(hpm, tr, sq[i]->dsq, &isc);
+			/* score match state insert emissions */
+			hpmscore_ScoreNullMatchEmissions(hpm, tr, sq[i]->dsq, &nmesc);
 			/* score transitions */
 			hpmscore_ScoreTransitions(hpm, tr, sq[i]->dsq, sq[i]->L, &tsc);
 
-			fprintf(stdout, "%d, %f\n", tr->N, sc);
+			/* calculate log of this samples contribution to importance sampling sum */
+			pr[r] = hsc + esc + tsc - sc_ld - nmesc;
+
+			// fprintf(stdout, "\t%d, %.2f, %.2f, %.2f, %2f, %.2f %.2f,\n", tr->N, sc_ld, sc_lg, hsc, esc, nmesc, tsc);
 			p7_trace_Reuse(tr);
 
 		}
 
+		float ls = esl_vec_DLogSum(pr, R);
+		fprintf(stdout, "%.2f\n", ls);
 		p7_refmx_Reuse(fwd);
+		float lp = fsc_ld - logf(R) + nesc + ls;
+		float ld = fsc_ld - logf(R) - ntsc + ls;
+		fprintf(stdout, "%.2f, %.2f, \n", lp, ld);
 	}
 
 
@@ -210,7 +225,7 @@ int hpmscore_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *r
 
 	for (z = 0; z < tr->N; z++) {
 
-		fprintf(stdout, "%d\n", z);
+		//fprintf(stdout, "%d\n", z);
 		/* check if we are in a match or delete state */
 		if (tr->st[z] == 2 || tr->st[z] == 6) {
 			i = tr->k[z];
@@ -260,11 +275,31 @@ int hpmscore_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *r
 	return eslOK;
 }
 
-int hpmscore_ScoreInsertions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_isc) {
-	int     z;          /* index for trace elements 	     */
-	int     i;          /* match state index			        */
-	int     a;          /* residue index            	     */
-	float   isc = 0.0;  /* log prob of insert emissions     */
+int hpmscore_ScoreNullEmissions(HPM *hpm, ESL_SQ *sq, float *ret_nesc) {
+	int    i;                 /* match state index             */
+	int    a;                 /* residue index                 */
+	float  nesc = 0.0;        /* log prob of insert emissions  */
+	int    K = hpm->abc->K;   /* alphabet size                 */
+
+	for (i = 1; i < sq->n+1; i++) {
+		a = sq->dsq[i];
+		/* treat all degenerate residues as first letter in abc  */
+		/* insert emissions cancel in log odds score anyways     */
+		/* this is possibly a half baked idea, 11/13/2018        */
+		if (a > K) a = 0;
+		  	nesc += log(hpm->ins[0][a]);
+
+	}
+
+	*ret_nesc = nesc;
+	return eslOK;
+}
+
+int hpmscore_ScoreNullMatchEmissions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_nmesc) {
+	int     z;            /* index for trace elements 	     */
+	int     i;            /* match state index			        */
+	int     a;            /* residue index            	     */
+	float   nmesc = 0.0;  /* log prob of insert emissions     */
 
 	int K = hpm->abc->K;
 
@@ -278,11 +313,11 @@ int hpmscore_ScoreInsertions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_is
 			/* insert emissions cancel in log odds score anyways     */
 			/* this is possibly a half baked idea, 11/13/2018        */
 			if (a > K) a = 0;
-		  	isc += log(hpm->ins[i][a]);
+		  	nmesc += log(hpm->ins[i][a]);
 		}
 	}
 
-	*ret_isc = isc;
+	*ret_nmesc = nmesc;
 
 	return eslOK;
 }
@@ -360,4 +395,18 @@ int hpmscore_ScoreTransitions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, int L, float
 	*ret_tsc = tsc;
 
 	return eslOK;
+}
+
+int hpmscore_ScoreNullTransitions(HPM *hpm, ESL_SQ *sq, P7_BG  *bg, float *ret_ntsc) {
+	float ntsc = 0.0;  /* log of null transition probs */
+
+	p7_bg_SetLength     (bg, sq->n);
+	p7_bg_NullOne(bg, sq->dsq, sq->n, &ntsc);
+
+
+
+	*ret_ntsc = ntsc;
+
+	return eslOK;
+
 }
