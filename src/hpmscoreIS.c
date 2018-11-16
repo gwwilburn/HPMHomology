@@ -124,13 +124,13 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 	P7_REFMX       *fwd       = p7_refmx_Create(100, 100);
 	P7_TRACE       *tr        = p7_trace_Create();
-	float           fsc_ld;                                 /* partial forward log odds score; output *
+	float           fsc;                                     /* partial forward log odds score; output *
 																				* calculated in p7_ReferenceForward()    */
 	float          *wrk       = NULL;
 
 	int             i;
 	int             r;                                      /* importance sample index                */
-	int             R         = 10000;                         /* total number of samples per sequence   */
+	int             R         = 10000;                      /* total number of samples per sequence   */
 	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
 	float           hsc;
 	float           esc;
@@ -149,8 +149,8 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	if (p7_profile_ConfigUniglocal(gm, hmm, bg, 400) != eslOK) esl_fatal("failed to configure profile");
 
 	/* outer loop over all sequences in seqfile */
-	//for (i = 0; i < totseq; i++) {
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < totseq; i++) {
+	//for (i = 0; i < 1; i++) {
 		if (i % 100 == 0) fprintf(stdout, "%d\n", i);
 
 
@@ -158,17 +158,16 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		p7_profile_SetLength(gm, sq[i]->n);
 
 		/* calculate forward dp matrix, forward score */
-		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc_ld);
+		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
 
 		/* calculate null emission scores */
 		hpmscore_ScoreNullEmissions(hpm, sq[i], &nesc);
 
 		/* calculate null transition scores */
-		hpmscore_ScoreNullTransitions(hpm, sq[i], bg, &ntsc);
+		hpmscore_ScoreNullTransitions(bg, sq[i], &ntsc);
 
 		/* inner loop over sampled paths */
 		for (r = 0; r < R; r++) {
-			fprintf(stdout, "%d\n", r);
 
 			/* perform stochastic traceback */
 			p7_reference_trace_Stochastic(rng, &wrk, gm, fwd, tr);
@@ -190,11 +189,10 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		}
 
 		float ls = esl_vec_DLogSum(pr, R);
-		fprintf(stdout, "%.2f\n", ls);
 		p7_refmx_Reuse(fwd);
-		float lp = fsc_ld - logf(R) + nesc + ls;
-		float ld = fsc_ld - logf(R) - ntsc + ls;
-		fprintf(stdout, "%.2f, %.2f, \n", lp, ld);
+		float ld = (fsc - logf(R) - ntsc + ls) / eslCONST_LOG2;
+		fprintf(stdout, "id, fsc, ntsc, fwd_ld, hpm_ld\n");
+		fprintf(stdout, "%s, %.2f, %.2f, %.2f,  %.2f, \n", sq[i]->name, fsc, ntsc, (fsc-ntsc) / eslCONST_LOG2 , ld);
 	}
 
 
@@ -397,13 +395,11 @@ int hpmscore_ScoreTransitions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, int L, float
 	return eslOK;
 }
 
-int hpmscore_ScoreNullTransitions(HPM *hpm, ESL_SQ *sq, P7_BG  *bg, float *ret_ntsc) {
+int hpmscore_ScoreNullTransitions(P7_BG  *bg, ESL_SQ *sq, float *ret_ntsc) {
 	float ntsc = 0.0;  /* log of null transition probs */
 
 	p7_bg_SetLength     (bg, sq->n);
 	p7_bg_NullOne(bg, sq->dsq, sq->n, &ntsc);
-
-
 
 	*ret_ntsc = ntsc;
 
