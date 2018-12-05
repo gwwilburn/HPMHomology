@@ -40,6 +40,7 @@ typedef struct hpm_s{
 extern HPM	         *hpm_Create(int M, ESL_ALPHABET *abc);
 extern HPM 				*hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc);
 extern HPM 				*hpm_Create_3mer(ESL_ALPHABET *abc);
+extern P7_HMM 		   *hmm_Create_3mer(ESL_ALPHABET *abc);
 extern int            IDX(int i, int j, int K);
 
 

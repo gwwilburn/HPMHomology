@@ -6,6 +6,7 @@ HMMERDIR = ../lib/hmmer/src
 INCLUDES = -I${HMMERDIR} -I${ESLDIR}
 IFLAGS   = -I${ESLDIR} -I${HMMERDIR} -I../src
 LFLAGS   = -L${ESLDIR} -L${HMMERDIR} -L../src
+DFLAGS   = -DHPM_3MER
 LIBS     = -lm
 SLIBS    = ${HMMERDIR}/libhmmer.a ${ESLDIR}/libeasel.a
 
@@ -51,7 +52,11 @@ hmm_scoreset: hmm_scoreset.c
 	${CC} ${CFLAGS} -c -o hmm_scoreset.o ${IFLAGS} hmm_scoreset.c
 
 
+3mer:
+	 ${CC} ${CFLAGS} -o hpm_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hpm.c ${DFLAGS} hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
+
+
 clean:
-	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_3mer
 
 .PHONY: all clean

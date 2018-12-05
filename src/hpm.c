@@ -190,14 +190,14 @@ hpm_Create_3mer(ESL_ALPHABET *abc) {
 			/* set all h_i's to 0 */
 			hpm->h[i][a] = 0;
 
-			/* set specific set of e_13's to be 1, else 0 */
+			/* set specific set of e_12's and e_23's to be 1, else 0 */
 			for (j=i+1; j < (M+1); j++) {
 				for (b=0; b < Kg; b++) {
 					idx  = IDX(a,b,Kg);
 					idx2 = IDX(b,a,Kg);
 					if ( j == (i+1) && (a+b) == abc->K) {
-						hpm->e[i][j][idx]  = 1.0;
-						hpm->e[j][i][idx2] = 1.0;
+						hpm->e[i][j][idx]  = 5.0;
+						hpm->e[j][i][idx2] = 5.0;
 					}
 					else {
 						hpm->e[i][j][idx]  = 0.0;
@@ -208,13 +208,32 @@ hpm_Create_3mer(ESL_ALPHABET *abc) {
 		}
 	}
 
-	/* set transition parameters */
-	for (i = 0; i < M+1; i++) {
-		hpm->t[i][HPM_MM] = 1.0 - (0.1)*(i+1);
-		hpm->t[i][HPM_MI] = (0.1)*(i+1);
-		hpm->t[i][HPM_IM] = 1.0 - (0.15)*(i+1);
-		hpm->t[i][HPM_II] = (0.15)*(i+1);
-	}
+	/* set transition parameters by hand */
+
+	/* node 0 */
+	hpm->t[0][HPM_MM] = 1.0;
+	hpm->t[0][HPM_MI] = 0.0;
+	hpm->t[0][HPM_IM] = 1.0;
+	hpm->t[0][HPM_II] = 0.0;
+
+	/* node 1*/
+	hpm->t[1][HPM_MM] = 0.9;
+	hpm->t[1][HPM_MI] = 0.1;
+	hpm->t[1][HPM_IM] = 0.7;
+	hpm->t[1][HPM_II] = 0.3;
+
+	/* node 2 */
+	hpm->t[2][HPM_MM] = 0.8;
+	hpm->t[2][HPM_MI] = 0.2;
+	hpm->t[2][HPM_IM] = 0.5;
+	hpm->t[2][HPM_II] = 0.5;
+
+	/* node 3 */
+	hpm->t[3][HPM_MM] = 1.0;
+	hpm->t[3][HPM_MI] = 0.0;
+	hpm->t[3][HPM_IM] = 1.0;
+	hpm->t[3][HPM_II] = 0.0;
+
 
 	return hpm;
 
@@ -222,10 +241,185 @@ hpm_Create_3mer(ESL_ALPHABET *abc) {
 		return NULL;
 }
 
+P7_HMM *
+hmm_Create_3mer(ESL_ALPHABET *abc)
+{
+	P7_HMM    *hmm   = NULL;  /* hmm object to return   */
+	P7_BG     *bg    = NULL;
+	int        M     = 3;     /* number of match states */
+	int        i;             /* node index             */
+	int        a;       	     /* residue index          */
+	char      errbuf[eslERRBUFSIZE];
+	int        status;
+
+	/* initiate hmm object */
+	hmm = p7_hmm_Create(M, abc);
+	/* allocate memory for things that aren't allocated by default */
+
+	ESL_ALLOC(hmm->consensus,  (M+2) * sizeof(char));
+	ESL_ALLOC(hmm->rf,         (M+2) * sizeof(char));
+	ESL_ALLOC(hmm->cs,         (M+2) * sizeof(char));
+	ESL_ALLOC(hmm->ca,         (M+2) * sizeof(char));
+	ESL_ALLOC(hmm->mm,         (M+2) * sizeof(char));
+
+
+	hmm->rf[0]          = ' ';
+	hmm->cs[0]          = ' ';
+	hmm->ca[0]          = ' ';
+	hmm->mm[0]          = ' ';
+
+	hmm->rf[M+1]        = '\0';
+	hmm->cs[M+1]        = '\0';
+	hmm->ca[M+1]        = '\0';
+	hmm->mm[M+1]        = '\0';
+
+
+	/* set corresponding bit flags */
+	hmm->flags |= p7H_CONS;
+	hmm->flags |= p7H_COMPO;
+	hmm->flags |= p7H_RF;
+	hmm->flags |= p7H_CS;
+	hmm->flags |= p7H_CA;
+	hmm->flags |= p7H_MMASK;
+
+	p7_hmm_SetName(hmm, "3mer");
+	/* set up background model, for insertion probabilities */
+	bg = p7_bg_Create(abc);
+
+	/* set transition probs by hand */
+
+	/* node 0 */
+	hmm->t[0][p7H_MM] = ((float) abc->K) / ( (float) abc->K +1.0);
+	hmm->t[0][p7H_MD] = 1./ ( (float) abc->K +1.0);
+	hmm->t[0][p7H_MI] = 0.0;
+	hmm->t[0][p7H_IM] = 1.0;
+	hmm->t[0][p7H_II] = 0.0;
+	hmm->t[0][p7H_DM] = 1.0;
+	hmm->t[0][p7H_DD] = 0.0;
+
+	/* node 1 */
+	hmm->t[1][p7H_MM] = 0.950 - 0.105;
+	hmm->t[1][p7H_MD] = 0.050;
+	hmm->t[1][p7H_MI] = 0.105;
+	hmm->t[1][p7H_IM] = 0.7;
+	hmm->t[1][p7H_II] = 0.3;
+	hmm->t[1][p7H_DM] = 0.994;
+	hmm->t[1][p7H_DD] = 0.006;
+
+	/* node 2 */
+	hmm->t[2][p7H_MM] = 0.950 - 0.210;
+	hmm->t[2][p7H_MD] = 0.050;
+	hmm->t[2][p7H_MI] = 0.210;
+	hmm->t[2][p7H_IM] = 0.5;
+	hmm->t[2][p7H_II] = 0.5;
+	hmm->t[2][p7H_DM] = 0.994;
+	hmm->t[2][p7H_DD] = 0.006;
+
+	/* node 3 */
+	hmm->t[3][p7H_MM] = 1.0;
+	hmm->t[3][p7H_MD] = 0.0;
+	hmm->t[3][p7H_MI] = 0.0;
+	hmm->t[3][p7H_IM] = 1.0;
+	hmm->t[3][p7H_II] = 0.0;
+	hmm->t[3][p7H_DM] = 1.0;
+	hmm->t[3][p7H_DD] = 0.0;
+
+	/* set node 0 transitions */
+	for (a=0;a<abc->K;a++){
+		hmm->ins[0][a] = bg->f[a];
+	}
+
+	/* set insertion and transitionprobabilities */
+	for (i=1;i<M+1;i++){
+
+		hmm->rf[i]        = '-';
+		hmm->cs[i]        = '-';
+		hmm->ca[i]        = '-';
+		hmm->mm[i]        = '-';
+
+		for (a=0;a<abc->K;a++){
+			hmm->mat[i][a] = 1./ ((float)abc->K);
+			hmm->ins[i][a] = bg->f[a];
+		}
+
+	}
+
+	/* set compo value */
+	p7_hmm_SetComposition(hmm);
+
+	p7_hmm_SetConsensus(hmm, NULL);
+
+	/* check hmm before returning */
+	if (p7_hmm_Validate    (hmm, errbuf, 0.0001)     != eslOK)  p7_Fail("3mer HMM is bad!!\n%s\n", errbuf);
+
+
+	/* clean up and return */
+	p7_bg_Destroy(bg);
+	return hmm;
+
+	ERROR:
+		return NULL;
+}
+
+
 int IDX(int i, int j, int K) {
 
 	return (i*K) + j;
 
 }
 
+/* creates 3_mer hmm and hpm */
+/* compile with make 3-mer */
 
+#ifdef HPM_3MER
+#include "p7_config.h"
+#include "esl_alphabet.h"
+#include "easel.h"
+#include "esl_getopts.h"
+#include "esl_vectorops.h"
+#include "hpmfile.h"
+
+static ESL_OPTIONS options[] = {
+	/* name           type      default  env  range  toggles reqs incomp  help                                       docgroup*/
+	{ "-h",        eslARG_NONE,   FALSE, NULL, NULL,   NULL,  NULL, NULL, "show brief help on version and usage",             0 },
+	{  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+};
+static char usage[]  = "[-options] <hmmoutfile> <hpmoutfile>";
+static char banner[] = "example of producing and writing 3mer hmm and hpm";
+
+int main(int argc, char *argv[]) {
+	ESL_GETOPTS  *go         = p7_CreateDefaultApp(options, 2, argc, argv, banner, usage);
+	HPM          *hpm        = NULL;                                                        /* 3mer hmm  */
+	P7_HMM       *hmm        = NULL;                                                        /* 3mer hpm  */
+	ESL_ALPHABET *abc        = NULL;
+	FILE         *hpm_fp     = NULL;
+	FILE         *hmm_fp     = NULL;
+	char         *hmmfile    = esl_opt_GetArg(go, 1);
+	char         *hpmfile    = esl_opt_GetArg(go, 2);
+
+	abc = esl_alphabet_Create(eslAMINO);
+
+	/* create hpm */
+	hpm = hpm_Create_3mer(abc);
+
+	/* write hpm */
+	if ((hpm_fp = fopen(hpmfile, "w")) == NULL) esl_fatal("Failed to open output hpm file %s for writing", hpmfile);
+	hpmfile_Write(hpm_fp, hpm);
+
+	/* create hmm */
+	hmm = hmm_Create_3mer(abc);
+
+	/* write hmm */
+	if ((hmm_fp = fopen(hmmfile, "w")) == NULL) esl_fatal("Failed to open output hmm file %s for writing", hmmfile);
+	p7_hmmfile_WriteASCII(hmm_fp, -1, hmm);
+
+
+	esl_alphabet_Destroy(abc);
+	esl_getopts_Destroy(go);
+	p7_hmm_Destroy(hmm);
+
+	return 0;
+
+}
+
+#endif
