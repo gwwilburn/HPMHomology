@@ -16,7 +16,7 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile hpm_scoreset potts pottsfile hpmscore hpmbuild hmm_scoreset hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS
+all: hpm hpmfile hpm_scoreset potts pottsfile hpmscore hpmbuild hmm_scoreset hmm_entropy hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
@@ -51,12 +51,16 @@ pottsfile: pottsfile.c
 hmm_scoreset: hmm_scoreset.c
 	${CC} ${CFLAGS} -c -o hmm_scoreset.o ${IFLAGS} hmm_scoreset.c
 
+hmm_entropy: hmm_entropy.c
+	${CC} ${CFLAGS} -c -o hmm_entropy.o ${IFLAGS} hmm_entropy.c
+
 
 3mer:
 	 ${CC} ${CFLAGS} -o hpm_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hpm.c ${DFLAGS} hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
+	 ${CC} ${CFLAGS} -o hmm_entropy_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c ${DFLAGS} ${SLIBS}
 
 
 clean:
-	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_3mer
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hmm_entropy.o hpm_3mer
 
 .PHONY: all clean
