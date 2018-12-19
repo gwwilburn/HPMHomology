@@ -29,7 +29,7 @@ int dp_IDX_special(int M, int state);
 /* Function: hmm_entropy_Calculate()
  *
  * Synopsis: Calculate the posterior entropy of a path given a sequence
- *           and model, H ( \vec{pi} | \vec{x} ).
+ *           and model, H ( \vec{\pi} | \vec{x} ).
  *
  * Purpose:  For a configured uniglocal profile HMM <gm> and precalculated
  *           forward matrix <fwd> which has been calculated using <gm> and an
@@ -77,7 +77,7 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 	int          idx_G        = 3;                       /* G state index for G, g                                    */
 	int          idx_E        = 0;                       /* E state index for Gx, gx                                  */
 	int          idx_C        = 1;                       /* C state index for Gx, gx                                  */
-	int          NSG          = 3;                       /* number of standard states per node (MG, IG, DG, G)        */
+	int          NSG          = 3;                       /* number of standard states per node (MG, IG, DG)           */
 	int          NSx          = 2;                       /* number of special states with non-zero entropy (E, C)     */
 	float        mgv;                                    /* MG value for current cell row                             */
 	float        dgv;                                    /* Pushed-ahead DG cell k+1 values                           */
@@ -415,16 +415,18 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 }
 
 /* Function: G_Create()
- * Synopsis: Allocate space for a NS x (NS+1) element
- * 			 log probability matrix, G, which is
- *           used in calculating intermediate posterior
- *           entropies of a profile HMM path distribution
- *           H ( \vec{\pi} | \vec{x} ) involving "standard"
- *           states (MG, IG, and DG for glocal profile HMM).
+ * Synopsis: Allocate space for a (NSG X NSG+1) element
+ * 			 log probability matrix, G
  *
- * Purpose:  Create matrix for G_k^{KL} (i) for one sequence
+ * Purpose:  Create matrix for G_L (i) for one sequence
  *           position i, node k. Elements correspond to
  *           log P (\pi_{i=1} | \pi_i, \vec{x}_i )
+ *
+ *    		 Gx is used in calculating intermediate posterior
+ *           entropies of a profile HMM path distribution
+ *           H ( \vec{\pi} | \vec{x} ) involving "special"
+ *           states with non-zero intermediate entropy
+ *           (E and C for a glocal profile hmm).
  *           See Hernando et al, 2003
  *
  *           rows: current state (\pi_i)
@@ -507,9 +509,8 @@ double
 }
 
 
-
 /* Function: G_Initialize()
- * Synopsis: Set all elements of G to -eslINFINITY
+ * Synopsis: Set all elements of <G> to -eslINFINITY
  *
  *
  * Purpose:  For reusing or creating a G matrix,
@@ -609,8 +610,8 @@ int dp_IDX_standard(int k, int state) {
 
 /* Function: dp_IDX_special()
  *
- * Synopsis: get an index corresponding to a certain "special" state
- *             type for a P7_REFMX dp array
+ * Synopsis: Get an index corresponding to a certain "special" state
+ *           type for a P7_REFMX dp array
  *
  * Purpose:  For a specific row dp[i] of the P7_REFMX dynamic programming
  *           matrix, special states are lumped into a single 1-D array
