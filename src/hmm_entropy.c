@@ -401,7 +401,8 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 		p7_refmx_DumpWindow(stdout, ent, 0, L, 0, M);
 	}
 
-	fprintf(stdout, "Total entropy: %f\n", 1.44269504*dpc[p7R_C]);
+	if (verbose) fprintf(stdout, "Total entropy: %f\n", 1.44269504*dpc[p7R_C]);
+
 	p7_refmx_Destroy(ent);
 	free(G);
 	free(g);

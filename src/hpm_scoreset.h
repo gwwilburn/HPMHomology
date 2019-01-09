@@ -15,7 +15,7 @@ typedef struct hpmscoreset_s{
 	char   **sqname;        /* sequence names [0..nseq-1][], \0-terminated            */
 	int 		nseq;          /* number of sequences                                    */
 	float   *E_hi;          /* Potts h_i pseudo-energies [0...nseq-1]                 */
-	float   *E_eij;         /* Potts e_ij pseudo-energies [0...nseq-1]                 */
+	float   *E_eij;         /* Potts e_ij pseudo-energies [0...nseq-1]                */
 	float   *lp_ins;        /* product of insertion probabilities [0...nseq-1]        */
 	float   *lp_trans;      /* product of transition probabilities [0...nseq-1]       */
 	float   *lpnull_match;  /* null model probabilities of match states [0...nseq-1]  */
@@ -23,9 +23,24 @@ typedef struct hpmscoreset_s{
 
 } HPM_SCORESET;
 
+
+typedef struct hpmisscoreset_s{
+	char   **sqname;        /* sequence names [0..nseq-1][], \0-terminated            */
+	int 		nseq;          /* number of sequences                                    */
+	int     *R;             /* number of stochastic traces                            */
+	float   *fwd;           /* forward log-odds scores                                */
+	float   *is_ld;         /* unnormalized importance sampling log-odds scores       */
+
+
+} HPM_IS_SCORESET;
+
+
+
 /* hpm_scoreset.c	*/
-extern HPM_SCORESET	*hpm_scoreset_Create(int nseq);
-extern int				 hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_SS);
+extern HPM_SCORESET	   *hpm_scoreset_Create(int nseq);
+extern HPM_IS_SCORESET	*hpm_is_scoreset_Create(int nseq);
+extern int				    hpm_scoreset_Write(FILE *fp, HPM_SCORESET *hpm_ss);
+extern int				    hpm_is_scoreset_Write(FILE *fp, HPM_IS_SCORESET *hpm_is_ss);
 
 
 #endif
