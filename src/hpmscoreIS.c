@@ -146,7 +146,7 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 	int             i;
 	int             r;                                      /* importance sample index                */
-	int             R         = 3;                      /* total number of samples per sequence   */
+	int             R         = 1;                          /* total number of samples per sequence   */
 	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
 	float           hsc;
 	float           esc;
@@ -235,6 +235,7 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		/* add scoring info to scoreset object */
 		hpm_is_ss->sqname[i]  = sq[i]->name;
 		hpm_is_ss->R[i]       = R;
+		hpm_is_ss->H[i]       = H;
 		hpm_is_ss->fwd[i]     = fsc-ntsc;
 		hpm_is_ss->is_ld[i]   = ld;
 	}

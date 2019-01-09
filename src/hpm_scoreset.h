@@ -28,6 +28,7 @@ typedef struct hpmisscoreset_s{
 	char   **sqname;        /* sequence names [0..nseq-1][], \0-terminated            */
 	int 		nseq;          /* number of sequences                                    */
 	int     *R;             /* number of stochastic traces                            */
+	float   *H;             /* Posterior path entropies H(pi | x)                     */
 	float   *fwd;           /* forward log-odds scores                                */
 	float   *is_ld;         /* unnormalized importance sampling log-odds scores       */
 
