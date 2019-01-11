@@ -10,9 +10,9 @@
 #include "esl_vectorops.h"
 #include "hpm.h"
 #include "hpmfile.h"
-#include "hpmscoreIS.h"
 #include "hmm_entropy.h"
 #include "hpm_scoreset.h"
+#include "hpm_scoreops.h"
 
 #include "hmmer.h"
 
@@ -82,7 +82,7 @@ int main(int argc, char **argv){
 	status = esl_sqfile_OpenDigital(abc, seqfile, format, NULL, &sqfp);
 	if      (status == eslENOTFOUND) p7_Fail("No such file.");
 	else if (status == eslEFORMAT)   p7_Fail("Format unrecognized.");
-	else if (status == eslEINVAL)    p7_Fail("Can't autodetect stdin or .gz.");
+	else if (status ==eslEINVAL)    p7_Fail("Can't autodetect stdin or .gz.");
 	else if (status != eslOK)        p7_Fail("Open failed, code %d.", status);
 
 	/* read sequences into array */
@@ -178,10 +178,10 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
 
 		/* calculate null emission scores */
-		hpmscore_ScoreNullEmissions(hpm, sq[i], &nesc);
+		hpm_scoreops_ScoreNullEmissions(hpm, sq[i], &nesc);
 
 		/* calculate null transition scores */
-		hpmscore_ScoreNullTransitions(bg, sq[i], &ntsc);
+		hpm_scoreops_ScoreNullTransitions(bg, sq[i], &ntsc);
 
 		/* calculate posterior entropy H(pi | x) */
 		hmm_entropy_Calculate(gm, fwd, &H, 0);
@@ -195,11 +195,11 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 			/* Calculate Q(x,\pi) under hmm */
 			p7_trace_Score(tr, sq[i]->dsq, gm, &sc_ld);
 			/* calculate Potts Hamiltonian */
-			hpmscore_CalculateHamiltonian(hpm, tr, sq[i]->dsq, &hsc, &esc);
+			hpm_scoreops_CalculateHamiltonian(hpm, tr, sq[i]->dsq, &hsc, &esc);
 			/* score match state insert emissions */
-			hpmscore_ScoreNullMatchEmissions(hpm, tr, sq[i]->dsq, &nmesc);
+			hpm_scoreops_ScoreNullMatchEmissions(hpm, tr, sq[i]->dsq, &nmesc);
 			/* score transitions */
-			hpmscore_ScoreTransitions(hpm, tr, sq[i]->dsq, sq[i]->L, &tsc);
+			hpm_scoreops_ScoreTransitions(hpm, tr, sq[i]->dsq, sq[i]->L, &tsc);
 
 			/* calculate log of this samples contribution to importance sampling sum */
 			pr[r] = hsc + esc + tsc - sc_ld - nmesc;
@@ -255,202 +255,3 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 }
 
-
-int hpmscore_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_hsc, float *ret_esc) {
-	int   z;         /* index for trace elements 	               */
-	int   y;         /* index for trace elements 	               */
-	int   i;         /* match state index                          */
-	int   j;         /* match state index                          */
-	int   a;         /* residue index            	               */
-	int   b;         /* residue index                              */
-	int   idx;       /* index for potts parameters                 */
-	float hsc = 0;   /* Hamiltonian contribution from h_i's        */
-	float esc = 0;   /* Hamiltonian contribution from e_ij's       */
-
-
-	int K = hpm->abc->K;
-
-	for (z = 0; z < tr->N; z++) {
-
-		//fprintf(stdout, "%d\n", z);
-		/* check if we are in a match or delete state */
-		if (tr->st[z] == 2 || tr->st[z] == 6) {
-			i = tr->k[z];
-
-			/* we have a match position */
-			if (tr->st[z] == 2) {
-				a = dsq[tr->i[z]];
-				if (a > K) a = K;
-
-				//fprintf(stdout, "%d\n", a);
-			}
-
-			/* we have a delete position */
-			else if (tr->st[z] == 6) {
-				a = K;
-			}
-			hsc += hpm->h[i][a];
-
-			/* now add e_ij terms to pseudo-energy */
-			for (y = z+1; y < tr->N; y++) {
-
-				/* check if we are in a match position */
-				if (tr->st[y] == 2 || tr->st[y] == 6) {
-					j = tr->k[y];
-
-					/* we have a match state */
-					if (tr->st[y] == 2) {
-						b = dsq[tr->i[y]];
-						if (b > K) b = K;
-					}
-
-					/* we have a delete state */
-					else if (tr->st[y] == 6) {
-						b = K;
-					}
-
-					idx = IDX(a,b,K+1);
-					//fprintf(stdout, "i=%d, j=%d, a=%d, b=%d, idx=%d\n", i, j, a, b, idx);
-					esc += hpm->e[i][j][idx];
-				}
-			}
-		}
-	}
-
-	*ret_hsc = hsc;
-	*ret_esc = esc;
-	return eslOK;
-}
-
-int hpmscore_ScoreNullEmissions(HPM *hpm, ESL_SQ *sq, float *ret_nesc) {
-	int    i;                 /* match state index             */
-	int    a;                 /* residue index                 */
-	float  nesc = 0.0;        /* log prob of insert emissions  */
-	int    K = hpm->abc->K;   /* alphabet size                 */
-
-	for (i = 1; i < sq->n+1; i++) {
-		a = sq->dsq[i];
-		/* treat all degenerate residues as first letter in abc  */
-		/* insert emissions cancel in log odds score anyways     */
-		/* this is possibly a half baked idea, 11/13/2018        */
-		if (a > K) a = 0;
-		  	nesc += log(hpm->ins[0][a]);
-
-	}
-
-	*ret_nesc = nesc;
-	return eslOK;
-}
-
-int hpmscore_ScoreNullMatchEmissions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_nmesc) {
-	int     z;            /* index for trace elements 	     */
-	int     i;            /* match state index			        */
-	int     a;            /* residue index            	     */
-	float   nmesc = 0.0;  /* log prob of insert emissions     */
-
-	int K = hpm->abc->K;
-
-	for (z = 0; z < tr->N; z++) {
-		/* we have a match state */
-		if (tr->st[z] == 2) {
-			i = tr->k[z];
-			a = dsq[tr->i[z]];
-			/* treat all degenerate residues as first letter in abc  */
-			/* insert emissions cancel in log odds score anyways     */
-			/* this is possibly a half baked idea, 11/13/2018        */
-			if (a > K) a = 0;
-		  	nmesc += log(hpm->ins[i][a]);
-		}
-	}
-
-	*ret_nmesc = nmesc;
-
-	return eslOK;
-}
-
-int hpmscore_ScoreTransitions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, int L, float *ret_tsc) {
-	int   z;              /* index for trace elements 	             */
-	int   st;
-	int   stprev  = -1;   /* state id index           	             */
-	int   i;              /* match state index			             */
-	int   iprev;          /* match state index			             */
-	float tsc     = 0.0;  /* log of transition probs                */
-	float tsc_NN  = 0.0;  /* log of N->N and C->C transition prob   */
-	float tsc_NB  = 0.0;  /* log of N->B and C->T transition prob   */
-
-	/* calculate N->N and C->C transition probability, in log space */
-	tsc_NN = log(L) - log(L+2);
-	/* calculate N->B and C->T transition probability, in log space */
-	tsc_NB = log(2) - log(L+2);
-
-	/* loop over trace positions for this seq */
-	for (z = 0; z < tr->N; z++) {
-		/* state type */
-		st = tr->st[z];
-		/* node in model */
-		i = tr->k[z];
-
-		/* handle transitions into N state */
-		if (st == 8) {
-			/*ignore S->N transitions, they have prob 1 */
-
-			/* handle N->N transitions */
-			if (stprev == 8)                     tsc = tsc + tsc_NN;
-		}
-
-		/* handle transitions into B state */
-		else if (st == 9) {
-			/* handle N->B transitons */
-			if (stprev == 8)                     tsc += tsc_NB;
-			/* no other transitions into B state possible */
-		}
-
-		/* handle transitions into hybrid match-del states */
-		else if (st == 2 || st == 6) {
-			/* handle M->M transitions */
-			if      (stprev == 2 || stprev == 6) tsc += log(hpm->t[iprev][HPM_MM]);
-			/* handle I->M transitions */
-			else if (stprev == 4)                tsc += log(hpm->t[iprev][HPM_IM]);
-			/* ignore B->M transitions, they have prob 1 */
-		}
-
-		/* handle transitions into I states */
-		else if (st == 4) {
-			/* handle M->I transitions */
-			if      (stprev == 2 || stprev == 6) tsc += log(hpm->t[iprev][HPM_MI]);
-			/* handle I->I transitions */
-			else if (stprev == 4)                tsc += log(hpm->t[iprev][HPM_II]);
-		}
-
-		/* handle transitions into C state */
-		else if (st == 13) {
-			if (stprev == 13)                    tsc += tsc_NN;
-			/* ignore E->C transitions, they have prob 1 */
-		}
-
-		/*handle transitions into T state */
-		else if (st == 15) {
-			if (stprev == 13)                    tsc += tsc_NB;
-			/* no other possible transitions to T state */
-		}
-
-		stprev = st;
-		iprev = i;
-	}
-
-	*ret_tsc = tsc;
-
-	return eslOK;
-}
-
-int hpmscore_ScoreNullTransitions(P7_BG  *bg, ESL_SQ *sq, float *ret_ntsc) {
-	float ntsc = 0.0;  /* log of null transition probs */
-
-	p7_bg_SetLength     (bg, sq->n);
-	p7_bg_NullOne(bg, sq->dsq, sq->n, &ntsc);
-
-	*ret_ntsc = ntsc;
-
-	return eslOK;
-
-}
