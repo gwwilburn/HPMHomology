@@ -16,9 +16,10 @@
 #include "hpmfile.h"
 #include "hmm_entropy.h"
 #include "hpm_scoreops.h"
+#include "hpm_trace.h"
 
 /* declaration of internal functions */
-
+int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *rng, int totseq, int verbose);
 
 
 static ESL_OPTIONS options[] = {
@@ -56,7 +57,6 @@ int main(int argc, char **argv){
 	ESL_SQFILE       *sqfp          = NULL;
 	FILE             *afp           = NULL;                      /* output alignment file */
 	ESL_MSA          *msa           = NULL;                      /* resulting msa */
-	P7_TRACE        **tr            = NULL;
 	int               outfmt        = eslMSAFILE_STOCKHOLM;
 	int               format        = eslSQFILE_UNKNOWN;
 	int               totseq        = 0;
@@ -94,6 +94,10 @@ int main(int argc, char **argv){
 		ESL_REALLOC(sq, sizeof(ESL_SQ *) * (totseq+nseq+1));
 		sq[totseq+nseq] = esl_sq_CreateDigital(abc);
 	}
+	totseq = nseq;
+
+	/* align sequences */
+	IS_align(hpm, hmm, sq, msa, rng, totseq, v);
 
 	/* clean up and return */
 	esl_sqfile_Close(sqfp);
@@ -103,10 +107,130 @@ int main(int argc, char **argv){
 	esl_alphabet_Destroy(abc);
 	esl_getopts_Destroy(go);
 	esl_msa_Destroy(msa);
-	free(tr);
 
 	return 0;
 
 	ERROR:
 		return status;
+}
+
+
+
+/* Function: IS_align()
+ * Synopisis: align sequences to an hmm by importance sampling paths
+ * (traces) from an hmm
+ *
+ * args: hpm     -  hpm object
+ *       hpm     -  corresponding hmm object
+ *       seq     -  array of sequences
+ *       msa     -  msa to be created
+ *       rng     -  <ESL_RANDOMNESS *> random number generator
+ *       totseq  -  total number of sequences in seq
+ *       verbose -  boolean integer specifying verbose mode
+ *
+ *       Returns: <eslOK> on success
+ */
+
+
+int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *rng, int totseq, int verbose)
+{
+	P7_BG          *bg        = NULL;
+	P7_PROFILE     *gm        = NULL;
+	P7_REFMX       *fwd       = p7_refmx_Create(100, 100);
+	P7_TRACE       *tr        = p7_trace_Create();
+	P7_TRACE      **out_tr    = NULL;                     /* traces used to construct msa */
+	float           fsc;
+	float           hsc;
+	float           esc;
+	float           isc;
+	float           tsc;
+	float           hpmsc;
+	float           hpmsc_max;
+	float          *wrk       = NULL;
+	int             i;                                    /* sequence index */
+	int             r;                                    /* sample index */
+	int             R         = 10;                       /* total number of samples/sequence */
+	float           H;                                    /* posterior path entropy */
+	int             status;
+
+	fprintf(stdout, "in funtion IS_align()\n");
+
+	/* allocate memory for traces  and initialize */
+	ESL_REALLOC(out_tr, sizeof(P7_TRACE *) * totseq);
+
+	/* create a profile from the HMM */
+	gm = p7_profile_Create(hmm->M, hmm->abc);
+	/* create null model*/
+	bg = p7_bg_Create(hmm->abc);
+	if (p7_profile_ConfigUniglocal(gm, hmm, bg, 400) != eslOK) esl_fatal("failed to configure profile");
+
+	/* outer loop over all sequences in seqfile */
+	for (i = 0; i < totseq; i++) {
+		hpmsc_max = -eslINFINITY;
+
+		if (i == 0) fprintf(stdout, "%d\n", i);
+
+		/* Set the profile and null model's target length models */
+		p7_profile_SetLength(gm, sq[i]->n);
+
+		/* calculate forward dp matrix, forward score */
+		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
+
+		/* calculate posterior entropy H(pi | x) */
+		hmm_entropy_Calculate(gm, fwd, &H, 0);
+
+		/* inner loop over samples */
+		for (r = 0; r < R; r++) {
+			if (verbose) fprintf(stdout, "\nsequence %s, stochastic trace %d\n", sq[i]->name, r);
+
+			/* perform stochastic traceback */
+			p7_reference_trace_Stochastic(rng, &wrk, gm, fwd, tr);
+
+			/* calculate Potts Hamiltonian */
+			hpm_scoreops_CalculateHamiltonian(hpm, tr, sq[i]->dsq, &hsc, &esc);
+
+			/* score insert state  emissions */
+			hpm_scoreops_ScoreInsertEmissions(hpm, tr, sq[i]->dsq, &isc);
+
+			/* score transitions */
+			hpm_scoreops_ScoreTransitions(hpm, tr, sq[i]->dsq, sq[i]->L, &tsc);
+
+			hpmsc = hsc + esc + isc + tsc;
+
+			if (hpmsc > hpmsc_max) {
+				hpmsc_max = hpmsc;
+				out_tr[i] = hpm_trace_Clone(tr);
+			}
+
+			if (verbose) {
+				p7_trace_DumpAnnotated(stdout, tr, gm, sq[i]->dsq);
+				fprintf(stdout, "\n");
+				fprintf(stdout, "# length of traceback: %d\n", tr->N);
+				fprintf(stdout, "# local field hamiltonian sum: %.4f\n", hsc);
+				fprintf(stdout, "# coupling hamiltonian sum: %.4f\n", esc);
+				fprintf(stdout, "# HPM insert emissions log prob: %.4f\n", isc);
+				fprintf(stdout, "# HPM transitions log prob: %.4f\n", tsc);
+				fprintf(stdout, "# Total HPM log prob: %.4f\n", hpmsc);
+				fprintf(stdout, "# Max HPM log prob: %.4f\n", hpmsc_max);
+				fprintf(stdout, "\n");
+			}
+			p7_trace_Reuse(tr);
+		}
+
+
+	}
+
+
+
+	/* clean up and return */
+	p7_profile_Destroy(gm);
+	p7_bg_Destroy(bg);
+	p7_refmx_Destroy(fwd);
+	p7_trace_Destroy(tr);
+	free(out_tr);
+	return eslOK;
+
+	ERROR:
+		return status;
+
 }
