@@ -74,6 +74,32 @@ int hpm_scoreops_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, floa
 }
 
 
+int hpm_scoreops_ScoreInsertEmissions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_isc)
+{
+	int     z;              /* index for trace elements   */
+	int     i;              /* match state index          */
+	int     a;              /* residue index            	*/
+	float   isc = 0.0;
+
+	for (z = 0; z < tr->N; z++) {
+
+		/* we have an insert position */
+		/* IG, N, or C states */
+		if (tr->st[z] == p7T_IG || (tr->st[z] == p7T_N && tr->i[z] > 0 ) || ((tr->st[z] == p7T_C && tr->i[z] > 0 )) ) {
+
+			/* get node index */
+			i = tr->k[z];
+			/* get emitted residue */
+			a = dsq[tr->i[z]];
+			/* update insert emission log prob */
+			isc += log(hpm->ins[i][a]);
+		}
+	}
+
+	*ret_isc = isc;
+	return eslOK;
+}
+
 int hpm_scoreops_ScoreNullEmissions(HPM *hpm, ESL_SQ *sq, float *ret_nesc) {
    int    i;                 /* match state index             */
    int    a;                 /* residue index                 */
