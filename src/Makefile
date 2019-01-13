@@ -16,7 +16,7 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile hpm_scoreset potts pottsfile hpmscore hpmbuild hmm_scoreset hpm_scoreops hmm_entropy hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS hpmalign
+all: hpm hpmfile hpm_scoreset hpm_trace potts pottsfile hpmscore hpmbuild hmm_scoreset hpm_scoreops hmm_entropy hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS hpmalign
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
@@ -34,7 +34,7 @@ hpmscoreIS: hpmscoreIS.c
 	${CC} ${CFLAGS} -o hpmscoreIS ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o ${SLIBS}
 
 hpmalign: hpmalign.c
-	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_trace.o ${SLIBS}
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
@@ -47,6 +47,9 @@ hpm_scoreset: hpm_scoreset.c
 
 hpm_scoreops: hpm_scoreops.c
 	${CC} ${CFLAGS} -c -o hpm_scoreops.o ${IFLAGS} hpm_scoreops.c
+
+hpm_trace: hpm_trace.c
+	${CC} ${CFLAGS} -c -o hpm_trace.o ${IFLAGS} hpm_trace.c
 
 potts: potts.c
 	${CC} ${CFLAGS} -c -o potts.o ${IFLAGS} potts.c
@@ -68,6 +71,6 @@ hmm_entropy: hmm_entropy.c
 
 
 clean:
-	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hmm_entropy.o hpm_3mer hpmalign
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign
 
 .PHONY: all clean
