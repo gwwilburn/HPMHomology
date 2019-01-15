@@ -224,7 +224,9 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
 
 				/* read insert emissions */
 				} else if (l == 1) {
-					ret_hpm->ins[i][tok_count] = exp(-atof(tok));
+					if (tok_count < abc->K) {
+						ret_hpm->ins[i][tok_count] = exp(-atof(tok));
+					}
 				}
 
 
