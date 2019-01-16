@@ -82,6 +82,7 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 	float        mgv;                                    /* MG value for current cell row                             */
 	float        dgv;                                    /* Pushed-ahead DG cell k+1 values                           */
 
+
 	/* set dimensions for dp matrix */
 	if ( (status = p7_refmx_GrowTo(ent, M, L)) != eslOK) return status;
 	ent->M    = M;
@@ -109,7 +110,6 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 		dpc = ent->dp[i];                 /* current DP row, skip k=0, start at k=1.                  */
 		fwp = fwd->dp[i-1];               /* previous row of forward matrix, starting at k=0          */
 		fwc = fwd->dp[i];                 /* current row of forward matrix, starting at k=0           */
-
 
 		/* set entropies for all k=0 standard states to zero */
 		for (s = 0; s < p7R_NSCELLS; s++){
@@ -180,7 +180,7 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 			G[idx_M][idx_M] =  P7P_TSC(gm, k-1, p7P_MM) + fwp[dp_IDX_standard(k-1, p7R_MG)];
 			G[idx_M][idx_I] =  P7P_TSC(gm, k-1, p7P_IM) + fwp[dp_IDX_standard(k-1, p7R_IG)];
 			G[idx_M][idx_D] =  P7P_TSC(gm, k-1, p7P_DM) + fwp[dp_IDX_standard(k-1, p7R_DG)];
-			G[idx_M][idx_G] =  P7P_TSC(gm, k-1, p7P_GM) + fwp[dp_IDX_special(p7R_G, M)];
+			G[idx_M][idx_G] =  P7P_TSC(gm, k-1, p7P_GM) + fwp[dp_IDX_special(M, p7R_G)];
 
 			DLogNorm_NoNan(G[idx_M], NSG+1);
 
@@ -462,7 +462,7 @@ double
 		return status;
 }
 
-/* Function: Gx_Initalize()
+/* Function: Gx_Create()
  * Synopsis: Allocate space for a (NSx X NSx) element
  * 			 log probability matrix, Gx,
  *
@@ -720,7 +720,6 @@ int main(int argc, char *argv[])
 
 		/* get fwd matrix */
 		p7_ReferenceForward (sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
-
 		p7_bg_NullOne(bg, sq[i]->dsq, sq[i]->n, &nullsc);
 
 		/* calculate H(pi | x) */
