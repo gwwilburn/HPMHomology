@@ -1,5 +1,6 @@
 /* hpmalign.c */
 /* align sequences to an hpm via importance sampling w/ an hmm */
+#include <math.h>
 
 #include "hmmer.h"
 #include "easel.h"
@@ -19,7 +20,7 @@
 #include "hpm_trace.h"
 
 /* declaration of internal functions */
-int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *rng, int totseq, int verbose);
+int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA **msa, ESL_RANDOMNESS *rng, int totseq, int verbose);
 
 
 static ESL_OPTIONS options[] = {
@@ -97,7 +98,13 @@ int main(int argc, char **argv){
 	totseq = nseq;
 
 	/* align sequences */
-	IS_align(hpm, hmm, sq, msa, rng, totseq, v);
+	IS_align(hpm, hmm, sq, &msa, rng, totseq, v);
+
+
+	/* write MSA to file*/
+	if ((afp = fopen(msafile, "w")) == NULL) esl_fatal("Failed to open output msafile %s for writing", msafile);
+	esl_msafile_Write(afp, msa, outfmt);
+	fclose(afp);
 
 	/* clean up and return */
 	esl_sqfile_Close(sqfp);
@@ -132,7 +139,7 @@ int main(int argc, char **argv){
  */
 
 
-int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *rng, int totseq, int verbose)
+int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA **msa, ESL_RANDOMNESS *rng, int totseq, int verbose)
 {
 	P7_BG          *bg        = NULL;
 	P7_PROFILE     *gm        = NULL;
@@ -149,14 +156,15 @@ int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *r
 	float          *wrk       = NULL;
 	int             i;                                    /* sequence index */
 	int             r;                                    /* sample index */
-	int             R         = 10;                       /* total number of samples/sequence */
+	int             R         = 10;                        /* total number of samples/sequence */
 	float           H;                                    /* posterior path entropy */
+	int             msaopts   = 0;
 	int             status;
 
 	fprintf(stdout, "in funtion IS_align()\n");
 
 	/* allocate memory for traces  and initialize */
-	ESL_REALLOC(out_tr, sizeof(P7_TRACE *) * totseq);
+	ESL_ALLOC(out_tr, sizeof(P7_TRACE *) * totseq);
 
 	/* create a profile from the HMM */
 	gm = p7_profile_Create(hmm->M, hmm->abc);
@@ -178,6 +186,9 @@ int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *r
 
 		/* calculate posterior entropy H(pi | x) */
 		hmm_entropy_Calculate(gm, fwd, &H, 0);
+
+		//R = pow(2,ceil(H));
+		//fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
 
 		/* inner loop over samples */
 		for (r = 0; r < R; r++) {
@@ -216,11 +227,11 @@ int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA *msa, ESL_RANDOMNESS *r
 			}
 			p7_trace_Reuse(tr);
 		}
-
-
 	}
 
-
+	/* create MSA from trace */
+	msaopts |= p7_ALL_CONSENSUS_COLS; /* include all consensus columns in alignment */
+	p7_tracealign_Seqs(sq, out_tr, totseq, hmm->M, msaopts, hmm, msa);
 
 	/* clean up and return */
 	p7_profile_Destroy(gm);
