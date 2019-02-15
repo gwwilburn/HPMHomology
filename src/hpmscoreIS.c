@@ -16,8 +16,11 @@
 
 #include "hmmer.h"
 
+#include <omp.h>
+
 /* declaration of internal functions */
 int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose);
+int Calculate_IS_scores_OMP(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose);
 
 
 static ESL_OPTIONS options[] = {
@@ -108,7 +111,8 @@ int main(int argc, char **argv){
 
 
 	/* calculate importance sampling score for all seqs */
-	Calculate_IS_scores(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
+	//Calculate_IS_scores(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
+	Calculate_IS_scores_OMP(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
 
 	/* write hpm is scores to output csv */
 	if ((hpm_is_ss_fp = fopen(scorefile, "w")) == NULL) esl_fatal("Failed to open output hpm IS scoreset file %s for writing", scorefile);
@@ -154,7 +158,6 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	float           nmesc;
 	float           ntsc;
 	float           tsc;
-	double          pr[R];
 	float           H;
 	int             status;
 
@@ -185,6 +188,15 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 		/* calculate posterior entropy H(pi | x) */
 		hmm_entropy_Calculate(gm, fwd, &H, 0);
+		R = pow(2,ceil(H));
+		if (H > 17.0)
+		{
+			R = 130000;  /* approx 2^17 */
+		}
+		if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
+
+		double pr[R];
+
 
 		/* inner loop over sampled paths */
 		for (r = 0; r < R; r++) {
@@ -216,8 +228,6 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 				fprintf(stdout, "# Null match state emission log prob: %.4f\n", nmesc);
 				fprintf(stdout, "# Contribution to importance sampling sum: %.4f\n", pr[r]);
 				fprintf(stdout, "\n");
-				//fprintf(stdout, "\t tr->N hpm->ld, hsc, esc, nmesc, tsc\n");
-				//fprintf(stdout, "\t%d, %.2f, %.2f, %.2f, %2f, %.2f %.2f,\n", tr->N, sc_ld, hsc, esc, nmesc, tsc);
 			}
 
 			p7_trace_Reuse(tr);
@@ -247,6 +257,145 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	p7_refmx_Destroy(fwd);
 	free(tr);
 	free(wrk);
+
+	return eslOK;
+
+	ERROR:
+		return status;
+
+}
+
+
+/* outer loop over all sequences in seqfile */
+int Calculate_IS_scores_OMP(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose) {
+
+	float           fsc;                                     /* partial forward log odds score; output *
+																				* calculated in p7_ReferenceForward()    */
+
+	int             i;
+	int             r;                                      /* importance sample index                */
+	int             R; 				                          /* total number of samples per sequence   */
+	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
+	float           hsc;
+	float           esc;
+	float           nesc;
+	float           nmesc;
+	float           ntsc;
+	float           tsc;
+	float           H;
+	int             status;
+
+
+	/* set number of threads */
+	//omp_set_num_threads(4);
+
+
+	/* outer loop over all sequences in seqfile */
+	#pragma omp parallel for private(fsc,i,r,R,sc_ld,hsc,esc,nesc,nmesc,ntsc,tsc,H,status)
+	for (i = 0; i < totseq; i++) {
+		P7_BG          *bg        = NULL;
+		P7_PROFILE     *gm        = NULL;
+
+		P7_REFMX       *fwd       = p7_refmx_Create(100, 100);
+		P7_TRACE       *tr        = p7_trace_Create();
+		float          *wrk       = NULL;
+
+		/* create a profile from the HMM */
+		gm = p7_profile_Create(hmm->M, hmm->abc);
+		/* create null model*/
+		bg = p7_bg_Create(hmm->abc);
+		/* configure model in uniglocal mode */
+		if (p7_profile_ConfigUniglocal(gm, hmm, bg, 400) != eslOK) esl_fatal("failed to configure profile");
+
+
+
+		if (i % 100 == 0) fprintf(stdout, "%d\n", i);
+
+		/* Set the profile and null model's target length models */
+		p7_profile_SetLength(gm, sq[i]->n);
+
+		/* calculate forward dp matrix, forward score */
+		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
+
+		/* calculate null emission scores */
+		hpm_scoreops_ScoreNullEmissions(hpm, sq[i], &nesc);
+
+		/* calculate null transition scores */
+		hpm_scoreops_ScoreNullTransitions(bg, sq[i], &ntsc);
+
+		/* calculate posterior entropy H(pi | x) */
+		hmm_entropy_Calculate(gm, fwd, &H, 0);
+
+		R = pow(2,ceil(H));
+		if (H > 17.0)
+		{
+			R = 130000;  /* approx 2^17 */
+		}
+		if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
+		double pr[R];
+
+		/* inner loop over sampled paths */
+		for (r = 0; r < R; r++) {
+			if (verbose) fprintf(stdout, "\nsequence %s, stochastic trace %d\n", sq[i]->name, r);
+
+			/* perform stochastic traceback */
+			p7_reference_trace_Stochastic(rng, &wrk, gm, fwd, tr);
+			/* Calculate Q(x,\pi) under hmm */
+			p7_trace_Score(tr, sq[i]->dsq, gm, &sc_ld);
+			/* calculate Potts Hamiltonian */
+			hpm_scoreops_CalculateHamiltonian(hpm, tr, sq[i]->dsq, &hsc, &esc);
+			/* score match state insert emissions */
+			hpm_scoreops_ScoreNullMatchEmissions(hpm, tr, sq[i]->dsq, &nmesc);
+			/* score transitions */
+			hpm_scoreops_ScoreTransitions(hpm, tr, sq[i]->dsq, sq[i]->L, &tsc);
+
+			/* calculate log of this samples contribution to importance sampling sum */
+			pr[r] = hsc + esc + tsc - sc_ld - nmesc;
+
+			if (verbose) {
+				fprintf(stdout, "# Q(x,pi) details\n");
+				p7_trace_DumpAnnotated(stdout, tr, gm, sq[i]->dsq);
+				fprintf(stdout, "\n");
+				fprintf(stdout, "# length of traceback: %d\n", tr->N);
+				fprintf(stdout, "# partial log odds score of x, pi: %.4f\n", sc_ld);
+				fprintf(stdout, "# local field hamiltonian sum: %.4f\n", hsc);
+				fprintf(stdout, "# coupling hamiltonian sum: %.4f\n", esc);
+				fprintf(stdout, "# HPM log odds transitions: %.4f\n", tsc);
+				fprintf(stdout, "# Null match state emission log prob: %.4f\n", nmesc);
+				fprintf(stdout, "# Contribution to importance sampling sum: %.4f\n", pr[r]);
+				fprintf(stdout, "\n");
+			}
+
+			p7_trace_Reuse(tr);
+
+		}
+
+		float ls = esl_vec_DLogSum(pr, R);
+		p7_refmx_Reuse(fwd);
+		float ld = (fsc - logf(R) - ntsc + ls) / eslCONST_LOG2;
+		if (verbose) {
+			fprintf(stdout, "\n\n## final details for sequence %s\n", sq[i]->name);
+			fprintf(stdout, "## id, fsc, ntsc, fwd_ld, H(pi | x), hpm_ld\n");
+			fprintf(stdout, "## %s, %.2f, %.2f, %.2f,  %.2f, %.2f\n", sq[i]->name, fsc, ntsc, (fsc-ntsc) / eslCONST_LOG2, H, ld);
+		}
+		/* add scoring info to scoreset object */
+		hpm_is_ss->sqname[i]  = sq[i]->name;
+		hpm_is_ss->R[i]       = R;
+		hpm_is_ss->H[i]       = H;
+		hpm_is_ss->fwd[i]     = fsc-ntsc;
+		hpm_is_ss->is_ld[i]   = ld;
+
+		/* outer loop clean-up */
+		p7_profile_Destroy(gm);
+		p7_bg_Destroy(bg);
+		p7_refmx_Destroy(fwd);
+		free(tr);
+		free(wrk);
+
+	}
+
+
+	/* clean up */
 
 	return eslOK;
 
