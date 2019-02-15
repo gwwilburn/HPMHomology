@@ -31,7 +31,7 @@ hmmalign_uniglocal: hmmalign_uniglocal.c
 	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c ${SLIBS}
 
 hpmscoreIS: hpmscoreIS.c
-	${CC} ${CFLAGS} -o hpmscoreIS ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmscoreIS -fopenmp ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o ${SLIBS}
 
 hpmalign: hpmalign.c
 	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_trace.o ${SLIBS}
@@ -62,7 +62,6 @@ hmm_scoreset: hmm_scoreset.c
 
 hmm_entropy: hmm_entropy.c
 	${CC} ${CFLAGS} -c -o hmm_entropy.o ${IFLAGS} hmm_entropy.c
-
 
 
 3mer:
