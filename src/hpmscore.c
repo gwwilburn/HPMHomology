@@ -476,7 +476,6 @@ int main(int argc, char *argv[])
 	esl_msa_Destroy(cfg.msa);
 	esl_msafile_Close(cfg.afp);
 	free(matassign);
-	p7_hmmfile_Close(cfg.hfp);
 	esl_getopts_Destroy(go);
 
 	return 0;
