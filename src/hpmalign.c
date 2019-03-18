@@ -192,6 +192,10 @@ int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA **msa, ESL_RANDOMNESS *
 		{
 			R = 130000;  /* approx 2^17 */
 		}
+		else if (R < 1000)
+		{
+			R = 1000;
+		}
 		fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
 
 		/* inner loop over samples */
