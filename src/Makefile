@@ -12,7 +12,7 @@ SLIBS    = ${HMMERDIR}/libhmmer.a ${ESLDIR}/libeasel.a
 
 #compiler information
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -o3
 
 # targest for make
 
@@ -31,7 +31,7 @@ hmmalign_uniglocal: hmmalign_uniglocal.c
 	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c ${SLIBS}
 
 hpmscoreIS: hpmscoreIS.c
-	${CC} ${CFLAGS} -o hpmscoreIS -fopenmp ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmscoreIS -fopenmp ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o hpm_trace.o ${SLIBS}
 
 hpmalign: hpmalign.c
 	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_trace.o ${SLIBS}
@@ -70,6 +70,6 @@ hmm_entropy: hmm_entropy.c
 
 
 clean:
-	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign hpmscoreIS
 
 .PHONY: all clean
