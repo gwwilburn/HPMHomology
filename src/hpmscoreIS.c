@@ -13,28 +13,38 @@
 #include "hmm_entropy.h"
 #include "hpm_scoreset.h"
 #include "hpm_scoreops.h"
+#include "hpm_trace.h"
 
 #include "hmmer.h"
 
 #include <omp.h>
 
 /* declaration of internal functions */
-int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose);
+int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int A, int verbose);
 int Calculate_IS_scores_OMP(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose);
+int Calculate_IS_scores_OMP2(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose);
 
 
 static ESL_OPTIONS options[] = {
-	/* name         type        default env   range togs  reqs  incomp      help                                                   docgroup */
-	{ "-h",         eslARG_NONE,  FALSE, NULL, NULL, NULL, NULL, NULL,           "help; show brief info on version and usage",                 0 },
-	{ "-s",         eslARG_INT,     "0", NULL, NULL, NULL, NULL, NULL,           "set random number seed to <n>",                              0 },
+	/* name         type         default  env range  togs   reqs  incomp         help                                                   docgroup */
+	{ "-h",         eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL, NULL,            "help; show brief info on version and usage",              0 },
+	{ "-s",         eslARG_INT,      "0", NULL, NULL, NULL, NULL, NULL,            "set random number seed to <n>",                           0 },
 
 	/* Options forcing which alphabet we're working in (normally autodetected) */
-   { "--amino",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                       1 },
-   { "--rna",      eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--dna,--amino",  "<seqfile> contains RNA sequences",                           1 },
-   { "--dna",      eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--rna,--amino",  "<seqfile> contains DNA sequences",                           1 },
+   { "--amino",    eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                    1 },
+   { "--rna",      eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--dna,--amino",  "<seqfile> contains RNA sequences",                        1 },
+   { "--dna",      eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--rna,--amino",  "<seqfile> contains DNA sequences",                        1 },
+
+	/* options for bounding sequences we score */
+   { "--msastart", eslARG_INT,     "-1", NULL, NULL, NULL, NULL, NULL,            "Start sequence",                                          2 },
+   { "--msaend",   eslARG_INT,     "-2", NULL, NULL, NULL, NULL, NULL,            "End sequence",                                            2 },
+
+
+	/* control of output */
+	{ "-A",         eslARG_OUTFILE, NULL, NULL, NULL, NULL, NULL, NULL,            "save multiple alignment of all hits to file <s>",         3 },
 
 	/* debugging tools */
-   { "--v",        eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,NULL,              "Verbose mode: print info on intermediate scoring steps",    2 },
+   { "--v",        eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL, NULL,            "Verbose mode: print info on intermediate scoring steps",  4 },
 {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
@@ -50,6 +60,9 @@ int main(int argc, char **argv){
 	char             *hmmfile       = esl_opt_GetArg(go, 2);
 	char             *seqfile       = esl_opt_GetArg(go, 3);
 	char             *scorefile     = esl_opt_GetArg(go, 4);
+	FILE             *afp           = NULL;                      /* alignment output file (-A)   */
+	ESL_MSA          *msa           = NULL;                      /* alignment output object (-A) */
+	int               outfmt        = eslMSAFILE_STOCKHOLM;      /* alignment output format (-A) */
 	HPM              *hpm;
 	P7_HMMFILE       *hmmfp         = NULL;
 	P7_HMM           *hmm           = NULL;
@@ -61,6 +74,9 @@ int main(int argc, char **argv){
 	int               totseq        = 0;
 	int               nseq          = 0;
 	int               v             = 0;                         /* Boolean for verbose mode */
+	int               A             = 0;                         /* Boolean for output alignment */
+	int               start;
+	int               end;
 	int               status;
 	char              errbuf[eslERRBUFSIZE];
 
@@ -72,6 +88,12 @@ int main(int argc, char **argv){
 
 	/* check for verbose mode */
 	if (esl_opt_GetBoolean(go, "--v")) v=1;
+
+	/* if output msa requested by user, try to open it */
+	if (esl_opt_IsOn(go, "-A")) {
+		if ((afp      = fopen(esl_opt_GetString(go, "-A"), "w")) == NULL) p7_Fail("Failed to open alignment file %s for writing\n", esl_opt_GetString(go, "-A"));
+		A = 1;
+  	}
 
 	/* read in hmm, autodetect alphabet if not manually set by user  */
 	if (p7_hmmfile_OpenE(hmmfile, NULL, &hmmfp, NULL) != eslOK) p7_Fail("Failed to open HMM file %s", hmmfile);
@@ -104,20 +126,37 @@ int main(int argc, char **argv){
 	else if (status != eslEOF)     esl_fatal("Unexpected error %d reading sequence file %s",
 			                                    status, sqfp->filename);
 
-	totseq = nseq;
+	/* if user specified bounds, set them here */
+	start = 0;
+	end   = nseq;
+
+	if (esl_opt_GetInteger(go, "--msastart") > -1) start = esl_opt_GetInteger(go, "--msastart");
+	if (esl_opt_GetInteger(go, "--msaend") > -1)     end = esl_opt_GetInteger(go, "--msaend");
+	if (end < start)  esl_fatal("msa start > msa end: %d, %d\n", start, end);
+
+	/* total number of sequences we will be scoring */
+	totseq = end-start;
 
 	/* set up score set object */
-	hpm_is_ss = hpm_is_scoreset_Create(nseq);
+	hpm_is_ss = hpm_is_scoreset_Create(totseq);
 
 
 	/* calculate importance sampling score for all seqs */
-	//Calculate_IS_scores(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
-	Calculate_IS_scores_OMP(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
+	Calculate_IS_scores(hpm, hmm, sq, rng, totseq, hpm_is_ss, start, end, &msa, A, v);
+	//Calculate_IS_scores_OMP(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
+	//Calculate_IS_scores_OMP2(hpm, hmm, sq, rng, totseq, hpm_is_ss, v);
 
 	/* write hpm is scores to output csv */
 	if ((hpm_is_ss_fp = fopen(scorefile, "w")) == NULL) esl_fatal("Failed to open output hpm IS scoreset file %s for writing", scorefile);
 	hpm_is_scoreset_Write(hpm_is_ss_fp, hpm_is_ss);
 	fclose(hpm_is_ss_fp);
+
+	/* if output msa requested, write it to otput file */
+	if (A) {
+		esl_msafile_Write(afp, msa, outfmt);
+		fclose(afp);
+		esl_msa_Destroy(msa);
+	}
 
 	/* clean up and return */
 	esl_sqfile_Close(sqfp);
@@ -136,7 +175,7 @@ int main(int argc, char **argv){
 
 
 /* outer loop over all sequences in seqfile */
-int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose) {
+int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int A, int verbose) {
 
 
 	P7_BG          *bg        = NULL;
@@ -148,7 +187,10 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 																				* calculated in p7_ReferenceForward()    */
 	float          *wrk       = NULL;
 
-	int             i;
+	P7_TRACE      **out_tr    = NULL;                       /* traces used to construct output msa  (-A) */
+	ESL_SQ        **out_sq    = NULL;                       /* traces used to construct output msa  (-A) */
+	int             msaopts   = 0;
+	int             i,j;
 	int             r;                                      /* importance sample index                */
 	int             R         = 1;                          /* total number of samples per sequence   */
 	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
@@ -158,6 +200,9 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	float           nmesc;
 	float           ntsc;
 	float           tsc;
+	float           isc;
+	float           hpmsc;
+	float           hpmsc_max;
 	float           H;
 	int             status;
 
@@ -169,9 +214,26 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	/* configure model in uniglocal mode */
 	if (p7_profile_ConfigUniglocal(gm, hmm, bg, 400) != eslOK) esl_fatal("failed to configure profile");
 
+	if (A) {
+		/* allocate memory for traces  and initialize */
+		ESL_ALLOC(out_tr, sizeof(P7_TRACE *) * totseq);
+		ESL_ALLOC(out_sq, sizeof(ESL_SQ *) *   (totseq+1));
+	}
+
 	/* outer loop over all sequences in seqfile */
-	for (i = 0; i < totseq; i++) {
-	//for (i = 0; i < 1; i++) {
+	for (i = start; i < end; i++) {
+
+	   /* index for score set: must start at 0 */
+		j=i-start;
+
+		/* for getting optimal path under hpm */
+		if (A) {
+			hpmsc_max = -eslINFINITY;
+			out_sq[j] = esl_sq_CreateDigital(hmm->abc);
+			esl_sq_Copy(sq[i], out_sq[j]);
+		}
+
+
 		if (i % 100 == 0) fprintf(stdout, "%d\n", i);
 
 		/* Set the profile and null model's target length models */
@@ -193,6 +255,9 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		{
 			R = 130000;  /* approx 2^17 */
 		}
+		else if (R < 1000) {
+			R = 1000;
+		}
 		if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
 
 		double pr[R];
@@ -200,6 +265,7 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 		/* inner loop over sampled paths */
 		for (r = 0; r < R; r++) {
+
 			if (verbose) fprintf(stdout, "\nsequence %s, stochastic trace %d\n", sq[i]->name, r);
 
 			/* perform stochastic traceback */
@@ -215,6 +281,24 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 			/* calculate log of this samples contribution to importance sampling sum */
 			pr[r] = hsc + esc + tsc - sc_ld - nmesc;
+
+			/* for output alignment */
+			if (A) {
+
+				/* score insert state  emissions */
+				hpm_scoreops_ScoreInsertEmissions(hpm, tr, sq[i]->dsq, &isc);
+
+				/* calculate numerator of log-odds score */
+
+				hpmsc = hsc + esc + isc + tsc;
+
+				/* see if we've got a better path */
+				if (hpmsc > hpmsc_max) {
+					hpmsc_max = hpmsc;
+					out_tr[j] = hpm_trace_Clone(tr);
+				}
+			}
+
 
 			if (verbose) {
 				fprintf(stdout, "# Q(x,pi) details\n");
@@ -243,19 +327,32 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 			fprintf(stdout, "## %s, %.2f, %.2f, %.2f,  %.2f, %.2f\n", sq[i]->name, fsc, ntsc, (fsc-ntsc) / eslCONST_LOG2, H, ld);
 		}
 		/* add scoring info to scoreset object */
-		hpm_is_ss->sqname[i]  = sq[i]->name;
-		hpm_is_ss->R[i]       = R;
-		hpm_is_ss->H[i]       = H;
-		hpm_is_ss->fwd[i]     = fsc-ntsc;
-		hpm_is_ss->is_ld[i]   = ld;
+		hpm_is_ss->sqname[j]  = sq[i]->name;
+		hpm_is_ss->R[j]       = R;
+		hpm_is_ss->H[j]       = H;
+		hpm_is_ss->fwd[j]     = fsc-ntsc;
+		hpm_is_ss->is_ld[j]   = ld;
 	}
 
+	/* if output msa requesed, create MSA from trace */
+	if (A) {
+		msaopts |= p7_ALL_CONSENSUS_COLS; /* include all consensus columns in alignment */
+		p7_tracealign_Seqs(out_sq, out_tr, totseq, hmm->M, msaopts, hmm, msa);
+	}
 
 	/* clean up */
+	if (A) {
+		for (j=0; j<totseq; j++) {
+			p7_trace_Destroy(out_tr[j]);
+			esl_sq_Destroy(out_sq[j]);
+		}
+		free(out_tr);
+		free(out_sq);
+	}
 	p7_profile_Destroy(gm);
 	p7_bg_Destroy(bg);
 	p7_refmx_Destroy(fwd);
-	free(tr);
+	p7_trace_Destroy(tr);
 	free(wrk);
 
 	return eslOK;
@@ -287,8 +384,6 @@ int Calculate_IS_scores_OMP(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
 
 
 	/* set number of threads */
-	//omp_set_num_threads(4);
-
 
 	/* outer loop over all sequences in seqfile */
 	#pragma omp parallel for private(fsc,i,r,R,sc_ld,hsc,esc,nesc,nmesc,ntsc,tsc,H,status)
@@ -330,6 +425,10 @@ int Calculate_IS_scores_OMP(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
 		if (H > 17.0)
 		{
 			R = 130000;  /* approx 2^17 */
+		}
+		if (R < 10000)
+		{
+			R = 10000;
 		}
 		if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
 		double pr[R];
@@ -396,6 +495,181 @@ int Calculate_IS_scores_OMP(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
 
 
 	/* clean up */
+
+	return eslOK;
+
+	ERROR:
+		return status;
+
+}
+
+
+/* outer loop over all sequences in seqfile */
+int Calculate_IS_scores_OMP2(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int verbose) {
+
+	float           fsc;                                     /* partial forward log odds score; output *
+																				* calculated in p7_ReferenceForward()    */
+
+	int             i;
+	int             r;                                      /* importance sample index                */
+	int             R; 				                          /* total number of samples per sequence   */
+	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
+	float           hsc;
+	float           esc;
+	float           nesc;
+	float           nmesc;
+	float           ntsc;
+	float           tsc;
+	float           H;
+	int             status;
+	int             nthread;
+	int             tid;                                    /* thread id */
+
+
+	/* set number of threads */
+	/* now set as ENVIRONMENT var in sbatch script */
+	//this will always print 1, hence why we hardcode nthread above
+	nthread = omp_get_max_threads();
+	fprintf(stdout, "nthread: %d\n", nthread);
+
+
+
+  /* allocate and create arrays of objects for parallel outer loop */
+	P7_TRACE       **tr        = NULL;
+	P7_PROFILE     **gm        = NULL;
+	P7_BG          **bg        = NULL;
+	P7_REFMX       **fwd       = NULL;
+
+	ESL_ALLOC(tr,  sizeof(P7_TRACE   *) * nthread);
+	ESL_ALLOC(bg,  sizeof(P7_BG      *) * nthread);
+	ESL_ALLOC(gm,  sizeof(P7_PROFILE *) * nthread);
+	ESL_ALLOC(fwd, sizeof(P7_REFMX   *) * nthread);
+
+
+	/* run Create() functions */
+	for (i=0; i<nthread; i++) {
+
+		fprintf(stdout, "\t allocating for ith trace: %d\n", i);
+		tr[i]  = p7_trace_Create();
+		gm[i]  = p7_profile_Create(hmm->M, hmm->abc);
+		bg[i]  = p7_bg_Create(hmm->abc);
+		fwd[i] = p7_refmx_Create(100, 100);
+	}
+
+	/* outer loop over all sequences in seqfile */
+	#pragma omp parallel for private(fsc,i,r,R,sc_ld,hsc,esc,nesc,nmesc,ntsc,tsc,H,tid,status)
+	for (i = 0; i < totseq; i++) {
+
+		/* which thread are we using? */
+		tid = omp_get_thread_num();
+		fprintf(stdout, "thread id: %d\n", tid);
+
+		float          *wrk       = NULL;
+
+
+		/* configure model in uniglocal mode */
+		if (p7_profile_ConfigUniglocal(gm[tid], hmm, bg[tid], 400) != eslOK) esl_fatal("failed to configure profile");
+
+
+		if (i % 100 == 0) fprintf(stdout, "%d\n", i);
+
+		/* Set the profile and null model's target length models */
+		p7_profile_SetLength(gm[tid], sq[i]->n);
+		p7_bg_SetLength(bg[tid], sq[i]->n);
+
+		/* calculate forward dp matrix, forward score */
+		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm[tid], fwd[tid], &fsc);
+
+		/* calculate null emission scores */
+		hpm_scoreops_ScoreNullEmissions(hpm, sq[i], &nesc);
+
+		/* calculate null transition scores */
+		hpm_scoreops_ScoreNullTransitions(bg[tid], sq[i], &ntsc);
+
+		/* calculate posterior entropy H(pi | x) */
+		hmm_entropy_Calculate(gm[tid], fwd[tid], &H, 0);
+
+		R = pow(2,ceil(H));
+		if (H > 17.0)
+		{
+			R = 130000;  /* approx 2^17 */
+		}
+		if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
+		double pr[R];
+
+		/* inner loop over sampled paths */
+		for (r = 0; r < R; r++) {
+			if (verbose) fprintf(stdout, "\nsequence %s, stochastic trace %d\n", sq[i]->name, r);
+
+			/* perform stochastic traceback */
+			p7_reference_trace_Stochastic(rng, &wrk, gm[tid], fwd[tid], tr[tid]);
+			/* Calculate Q(x,\pi) under hmm */
+			p7_trace_Score(tr[tid], sq[i]->dsq, gm[tid], &sc_ld);
+			/* calculate Potts Hamiltonian */
+			hpm_scoreops_CalculateHamiltonian(hpm, tr[tid], sq[i]->dsq, &hsc, &esc);
+			/* score match state insert emissions */
+			hpm_scoreops_ScoreNullMatchEmissions(hpm, tr[tid], sq[i]->dsq, &nmesc);
+			/* score transitions */
+			hpm_scoreops_ScoreTransitions(hpm, tr[tid], sq[i]->dsq, sq[i]->L, &tsc);
+
+			/* calculate log of this samples contribution to importance sampling sum */
+			pr[r] = hsc + esc + tsc - sc_ld - nmesc;
+
+			if (verbose) {
+				fprintf(stdout, "# Q(x,pi) details\n");
+				p7_trace_DumpAnnotated(stdout, tr[tid], gm[tid], sq[i]->dsq);
+				fprintf(stdout, "\n");
+				fprintf(stdout, "# length of traceback: %d\n", tr[tid]->N);
+				fprintf(stdout, "# partial log odds score of x, pi: %.4f\n", sc_ld);
+				fprintf(stdout, "# local field hamiltonian sum: %.4f\n", hsc);
+				fprintf(stdout, "# coupling hamiltonian sum: %.4f\n", esc);
+				fprintf(stdout, "# HPM log odds transitions: %.4f\n", tsc);
+				fprintf(stdout, "# Null match state emission log prob: %.4f\n", nmesc);
+				fprintf(stdout, "# Contribution to importance sampling sum: %.4f\n", pr[r]);
+				fprintf(stdout, "\n");
+			}
+
+			p7_trace_Reuse(tr[tid]);
+
+		}
+
+		float ls = esl_vec_DLogSum(pr, R);
+		float ld = (fsc - logf(R) - ntsc + ls) / eslCONST_LOG2;
+		if (verbose) {
+			fprintf(stdout, "\n\n## final details for sequence %s\n", sq[i]->name);
+			fprintf(stdout, "## id, fsc, ntsc, fwd_ld, H(pi | x), hpm_ld\n");
+			fprintf(stdout, "## %s, %.2f, %.2f, %.2f,  %.2f, %.2f\n", sq[i]->name, fsc, ntsc, (fsc-ntsc) / eslCONST_LOG2, H, ld);
+		}
+		/* add scoring info to scoreset object */
+		hpm_is_ss->sqname[i]  = sq[i]->name;
+		hpm_is_ss->R[i]       = R;
+		hpm_is_ss->H[i]       = H;
+		hpm_is_ss->fwd[i]     = fsc-ntsc;
+		hpm_is_ss->is_ld[i]   = ld;
+
+		/* outer loop clean-up */
+		free(wrk);
+		p7_trace_Reuse(tr[tid]);
+		p7_refmx_Reuse(fwd[tid]);
+
+	}
+
+
+	/* clean up */
+
+	/* step 1: loop through arrays, run Destroy() functions */
+	for (i=0;i<nthread;i++) {
+		p7_trace_Destroy(tr[i]);
+		p7_profile_Destroy(gm[i]);
+		p7_bg_Destroy(bg[i]);
+		p7_refmx_Destroy(fwd[i]);
+	}
+
+	/* step 2: free memory for arrays */
+	free(tr);
+	free(gm);
+	free(bg);
+	free(fwd);
 
 	return eslOK;
 
