@@ -245,7 +245,7 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		hpm_scoreops_ScoreNullTransitions(bg, sq[i], &ntsc);
 
 		/* calculate posterior entropy H(pi | x) */
-		hmm_entropy_Calculate(gm, fwd, &H, 0);
+		hmm_entropy_CalculateHernando(gm, fwd, &H, 0);
 		R = pow(2,ceil(H));
 		if (H > 17.0)
 		{
