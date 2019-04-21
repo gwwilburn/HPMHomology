@@ -17,5 +17,7 @@
 #include "base/p7_profile.h"
 
 /* hmm_entropy.c */
-extern float     hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose);
+extern int       hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose);
+extern int       hmm_entropy_CalculateHernando(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int opt_L, int verbose);
+extern int       hmm_entropy_CalculateSampling(P7_PROFILE *gm, P7_REFMX *fwd, ESL_RANDOMNESS *rng, int nsamp, float *ret_H, int verbose);
 #endif
