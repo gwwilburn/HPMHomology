@@ -12,7 +12,7 @@ SLIBS    = ${HMMERDIR}/libhmmer.a ${ESLDIR}/libeasel.a
 
 #compiler information
 CC = gcc
-CFLAGS = -Wall -o3
+CFLAGS = -Wall -g
 
 # targest for make
 
@@ -31,7 +31,7 @@ hmmalign_uniglocal: hmmalign_uniglocal.c
 	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c ${SLIBS}
 
 hpmscoreIS: hpmscoreIS.c
-	${CC} ${CFLAGS} -o hpmscoreIS -fopenmp ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o hpm_trace.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmscoreIS ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_scoreset.o hpm_trace.o ${SLIBS}
 
 hpmalign: hpmalign.c
 	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_trace.o ${SLIBS}
@@ -68,8 +68,16 @@ hmm_entropy: hmm_entropy.c
 	 ${CC} ${CFLAGS} -o hpm_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hpm.c ${DFLAGS} hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
 	 ${CC} ${CFLAGS} -o hmm_entropy_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c ${DFLAGS} ${SLIBS}
 
+entropy_msa:
+	${CC} ${CFLAGS} -o hmm_entropy_msa ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c  -DENTROPY_MSA ${SLIBS}
+
+utest:
+	 ${CC} ${CFLAGS} -o hmm_entropy_utest ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c -DHMMENTROPY_TESTDRIVE ${SLIBS}
 
 clean:
-	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign hpmscoreIS
+	rm -f hpmscore hpmbuild hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign hpmscoreIS hpm_entropy_3mer hmm_entropy_msa hmm_entropy_utest
+
+
+
 
 .PHONY: all clean
