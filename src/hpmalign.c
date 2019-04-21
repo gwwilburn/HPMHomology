@@ -185,7 +185,7 @@ int IS_align(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_MSA **msa, ESL_RANDOMNESS *
 		p7_ReferenceForward(sq[i]->dsq, sq[i]->n, gm, fwd, &fsc);
 
 		/* calculate posterior entropy H(pi | x) */
-		hmm_entropy_CalculateHernando(gm, fwd, &H, 0);
+		hmm_entropy_CalculateHernando(gm, fwd, &H, -1, 0);
 
 		R = pow(2,ceil(H));
 		if (H > 17.0)
