@@ -11,6 +11,7 @@
 
 /* hpm_scoreops.c */
 extern int hpm_scoreops_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_hsc, float *ret_esc);
+extern int hpm_scoreops_CalculateHamiltonianSingleSite(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, int i, float *ret_Ei);
 extern int hpm_scoreops_ScoreInsertEmissions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_isc);
 extern int hpm_scoreops_ScoreNullEmissions(HPM *hpm, ESL_SQ *sq, float *ret_nesc);
 extern int hpm_scoreops_ScoreNullMatchEmissions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_nmesc);

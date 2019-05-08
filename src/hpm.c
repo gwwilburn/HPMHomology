@@ -74,6 +74,50 @@ hpm_Create(int M, ESL_ALPHABET *abc)
 	return NULL;
 }
 
+/* Function:  hpm_Destroy()
+ * Synopsis:  Free an <HPM>
+ *
+ * Purpose: Frees the body of an <HPM>
+ *
+ * Note:    Based on p7_hmm_Destroy()
+ *
+ * Returns: (void).
+ */
+
+void
+hpm_Destroy(HPM *hpm)
+{
+	int i,j;
+
+	if (hpm == NULL) return;
+
+	if (hpm->ins) {  if (hpm->ins[0]) free(hpm->ins[0]); free(hpm->ins); }
+	if (hpm->t)   {  if (hpm->t[0])   free(hpm->t[0]);   free(hpm->t);   }
+
+	/* free hi array */
+	if (hpm->h && hpm->M) {
+		for (i=0; i < hpm->M+1; i++) {
+			if (hpm->h[i]) free(hpm->h[i]);
+		}
+		free(hpm->h);
+	}
+
+	/* free eij array */
+	if (hpm->e && hpm->M) {
+		for (i=0; i < hpm->M+1; i++) {
+			for (j=0; j < hpm->M+1; j++) {
+				if (hpm->e[i][j]) free(hpm->e[i][j]);
+			}
+			if (hpm->e[i]) free(hpm->e[i]);
+		}
+		free(hpm->e);
+	}
+
+	free(hpm);
+
+	return;
+}
+
 HPM *
 hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 

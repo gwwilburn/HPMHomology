@@ -19,6 +19,10 @@ enum hpm_transitions {
 };
 
 #define HPM_NTRANSITIONS 4
+#define HPM_TMAT(hpm, k) ((hpm)->t[k])
+#define HPM_TINS(hpm, k) ((hpm)->t[k]+2)
+#define HPM_NTMAT 2
+#define HPM_NTINS 2
 
 
 
@@ -38,6 +42,7 @@ typedef struct hpm_s{
 
 /* hpm.c	*/
 extern HPM	         *hpm_Create(int M, ESL_ALPHABET *abc);
+extern void           hpm_Destroy(HPM *hpm);
 extern HPM 				*hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc);
 extern HPM 				*hpm_Create_3mer(ESL_ALPHABET *abc);
 extern P7_HMM 		   *hmm_Create_3mer(ESL_ALPHABET *abc);
