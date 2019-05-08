@@ -230,7 +230,8 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		}
 
 
-		if (i % 100 == 0) fprintf(stdout, "%d\n", i);
+		//if (i % 100 == 0) fprintf(stdout, "%d\n", i);
+		fprintf(stdout, "seq %d: %s\n", i, sq[i]->name);
 
 		/* Set the profile and null model's target length models */
 		p7_profile_SetLength(gm, sq[i]->n);
@@ -246,10 +247,10 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 		/* calculate posterior entropy H(pi | x) */
 		hmm_entropy_CalculateHernando(gm, fwd, &H, -1, 0);
-		R = pow(2,ceil(H));
-		if (H > 17.0)
+		R = pow(2,ceil(H)+1);
+		if (H > 29.0)
 		{
-			R = 130000;  /* approx 2^17 */
+			R = pow(2,30);  /* approx 1e9 */
 		}
 		else if (R < 1000) {
 			R = 1000;
