@@ -21,21 +21,23 @@
 #include "hpm_scoreops.h"
 
 static ESL_OPTIONS options[] = {
-   /* name         type        default env   range togs  reqs  incomp      help                                                   docgroup */
-	{ "-h",         eslARG_NONE,  FALSE, NULL, NULL,  NULL, NULL, NULL,           "help; show brief info on version and usage",                          0 },
-	{ "-s",         eslARG_INT,     "0", NULL, NULL,  NULL, NULL, NULL,           "set random number seed to <n>",                                       0 },
+   /* name         type           default env   range togs  reqs  incomp      help                                                   docgroup */
+	{ "-h",         eslARG_NONE,   FALSE, NULL, NULL,  NULL, NULL, NULL,           "help; show brief info on version and usage",                                   0 },
+	{ "-s",         eslARG_INT,      "0", NULL, NULL,  NULL, NULL, NULL,           "set random number seed to <n>",                                                0 },
 
-	/* options controlling N */
-	{ "-N",          eslARG_INT,    "1", NULL, "n>0", NULL, NULL, NULL, "number of seqs to sample",                                                      1 },
-	{ "-L",          eslARG_INT,  "100", NULL, "n>0", NULL, NULL, NULL, "set expected length from profile to <l> (for N and C state transition probs)",  1 },
+	/* options controlling sequence emission */
+	{ "-N",          eslARG_INT,     "1", NULL, "n>0", NULL, NULL, NULL, "number of seqs to sample",                                                               1 },
+	{ "-L",          eslARG_INT,   "100", NULL, "n>0", NULL, NULL, NULL, "set expected length from profile to <l> (for N and C state transition probs)",           1 },
+	{ "--Niter",     eslARG_INT,  "1000", NULL, "n>0", NULL, NULL, NULL, "number of MCMC iterations per sequence",                                                 1 },
 
 	/* Options forcing which alphabet we're working in (normally autodetected) */
-	{ "--amino",    eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                                 2 },
-	{ "--rna",      eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--dna,--amino",  "<seqfile> contains RNA sequences",                                     2 },
-	{ "--dna",      eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,"--rna,--amino",  "<seqfile> contains DNA sequences",                                     2 },
+	{ "--amino",    eslARG_NONE,   FALSE, NULL, NULL, NULL,NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                                          2 },
+	{ "--rna",      eslARG_NONE,   FALSE, NULL, NULL, NULL,NULL,"--dna,--amino",  "<seqfile> contains RNA sequences",                                              2 },
+	{ "--dna",      eslARG_NONE,   FALSE, NULL, NULL, NULL,NULL,"--rna,--amino",  "<seqfile> contains DNA sequences",                                              2 },
 
 	/* debugging tools */
-	{ "-v",         eslARG_NONE,  FALSE, NULL, NULL, NULL,NULL,NULL,              "Verbose mode: print info on intermediate emission steps",             3 },
+	{ "-v",         eslARG_NONE,   FALSE, NULL, NULL, NULL,NULL,NULL,              "Verbose mode: print info on intermediate emission steps",                      3 },
+	{ "--burnin",   eslARG_OUTFILE,FALSE, NULL, NULL, NULL,NULL,NULL,              "send csv of Potts hamiltonian vs MCMC iteration (first sequence only) to <f>", 3 },
 
 	{ 0,0,0,0,0,0,0,0,0,0 },
 };
@@ -45,7 +47,7 @@ static char banner[]  = "sample aligned sequence(s) from a uniglocal HPM";
 
 /* declaration of internal functions */
 static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *rng, HPM *hpm, int v);
-int 			emit_match_MCMC(ESL_SQ *msq, HPM *hpm, ESL_RANDOMNESS *rng, int v);
+int 			emit_match_MCMC(ESL_SQ *msq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int v);
 int         sample_trace(int L, P7_TRACE *tr, ESL_SQ *msq, HPM *hpm,  ESL_RANDOMNESS *rng, int v);
 int         emit_inserts(P7_TRACE *tr, ESL_SQ *sq, ESL_SQ *msq, HPM *hpm,  ESL_RANDOMNESS *rng, int v);
 
@@ -121,10 +123,14 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 	P7_TRACE **tr        = NULL;
 	int        N         = esl_opt_GetInteger(go, "-N");
 	int        L         = esl_opt_GetInteger(go, "-L");
+	int        Niter     = esl_opt_GetInteger(go, "--Niter");
+	/* add burn-in file path and OFP */
 	int        optflags  = p7_ALL_CONSENSUS_COLS;
 	int        i,j;
 
 	if (v) fprintf(stdout, "in emit_alignment()\n");
+
+	/* open burn-in file */
 
 	/* allocate space for trace and seq arrays */
 	if ((tr = malloc(sizeof(P7_TRACE *) * N)) == NULL) esl_fatal("failed to allocate trace array");
@@ -141,8 +147,9 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 		if ((tr[i] = p7_trace_Create())              == NULL) esl_fatal("failed to allocate trace");
 
 
+		/* PASS BURN-IN FILE */
 		/* emit match states from Potts prob dist via MCMC */
-		emit_match_MCMC(msq, hpm, rng, v);
+		emit_match_MCMC(msq, hpm, Niter, rng, v);
 
 		/* generate trace */
 		/* pass match sequence to this function */
@@ -167,6 +174,8 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 
 	}
 
+	/* write burn-in file */
+
 	/* Write MSA to outfile */
 	p7_tracealign_Seqs(sq, tr, N, hpm->M, optflags, NULL, &msa);
 	esl_msafile_Write(ofp, msa, outfmt);
@@ -183,13 +192,15 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 	return;
 }
 
-int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, ESL_RANDOMNESS *rng, int v)
+
+/* modify to accept burn-in file */
+
+int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int v)
 {
 	int        k;           /* node index                          */
 	int        i;           /* sequence index                      */
 	int        x;           /* sampled sequence                    */
 	int        n;           /* MCMC iteration index                */
-	int        niter;       /* number of MCMC iterations           */
 	float      hsc,esc;     /* Potts Hamiltonian params            */
 	float      Ei,Ei_tmp;   /* Potts Hamiltonian params            */
 	float      deltaE;      /* Potts Hamiltonian params            */
@@ -198,7 +209,6 @@ int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, ESL_RANDOMNESS *rng, int v)
 	float      p,r;         /* for accepting/rejecting seq changes */
 	int        status;
 
-	niter = 1000;
 
 	sq_tmp = esl_sq_CreateDigital(hpm->abc);
 
@@ -236,7 +246,7 @@ int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, ESL_RANDOMNESS *rng, int v)
 
 	}
 	/* run Metropolis Algorithm */
-	for (n = 0; n < niter; n++) {
+	for (n = 0; n < Niter; n++) {
 		esl_sq_Copy(sq, sq_tmp);
 
 
@@ -291,6 +301,10 @@ int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, ESL_RANDOMNESS *rng, int v)
 			}
 		}
 
+		//if (n % 100 == 0) {
+		//	hpm_scoreops_CalculateHamiltonian(hpm, tr, sq->dsq, &hsc, &esc);
+		//	fprintf(stdout, "%d,%.4f\n", n, hsc + esc);
+		//}
 		esl_sq_Reuse(sq_tmp);
 	}
 
