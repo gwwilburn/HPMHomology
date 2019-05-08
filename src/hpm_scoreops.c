@@ -74,6 +74,71 @@ int hpm_scoreops_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, floa
 }
 
 
+int hpm_scoreops_CalculateHamiltonianSingleSite(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, int i, float *ret_Ei) {
+   int   y;           /* index for trace elements                   */
+   int   z;           /* index for trace elements                   */
+   int   j;           /* match state index                          */
+   int   a;           /* residue index                              */
+   int   b;           /* residue index                              */
+   int   idx;         /* index for potts parameters                 */
+   float Ei = 0.0;   /* Hamiltonian contribution for site i        */
+   int K = hpm->abc->K;
+
+	//fprintf(stdout, "\t in hpm_scoreops_CalculateHamiltonianSingleSite()\n");
+
+	/* figure out which node and residue we are dealing with */
+	for (y = 0; y < tr->N; y++) {
+
+		//fprintf(stdout, "\t\ty: %d\n", y);
+		if (tr->st[y] == p7T_MG || tr->st[y] == p7T_MG) {
+			if (tr->k[y] == i) {
+				z = y;
+				a = dsq[tr->i[z]];
+				//fprintf(stdout, "\t\t\tWe've found our node! z = %d k = %d a =%d\n",
+				//		  z, tr->k[y], a);
+				break;
+			}
+		}
+	}
+
+	/* get h_i term */
+	Ei += hpm->h[i][a];
+	for (y = 0; y < tr->N; y++) {
+		if (z == y) continue;
+		//fprintf(stdout, "\t\ty: %d\n", y);
+
+		if (tr->st[y] == p7T_MG || tr->st[y] == p7T_DG) {
+
+			j = tr->k[y];
+
+			/* we have a match state */
+			if (tr->st[y] == p7T_MG) {
+				b = dsq[tr->i[y]];
+				if (b > K) b = K;
+			}
+
+			/* we have a delete state */
+			else if (tr->st[y] == p7T_DG) {
+				b = K;
+			}
+
+			idx = IDX(a,b,K+1);
+			//fprintf(stdout, "\t\t\ti=%d, j=%d, a=%d, b=%d, idx=%d, eij[a][b]=%.4f\n",
+			//		  i, j, a, b, idx,hpm->e[i][j][idx]);
+         Ei += hpm->e[i][j][idx];
+		}
+	}
+
+	/* loop over trace to get e_ij terms */
+
+   *ret_Ei = Ei;
+
+   return eslOK;
+}
+
+
+
+
 int hpm_scoreops_ScoreInsertEmissions(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, float *ret_isc)
 {
 	int     z;              /* index for trace elements   */
