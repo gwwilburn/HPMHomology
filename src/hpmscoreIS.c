@@ -17,8 +17,6 @@
 
 #include "hmmer.h"
 
-#include <omp.h>
-
 /* declaration of internal functions */
 int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int user_R, int A, int verbose);
 
