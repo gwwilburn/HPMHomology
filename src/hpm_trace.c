@@ -1,5 +1,7 @@
 /* hpm_trace.h */
 
+#include <string.h>
+
 #include "hmmer.h"
 #include "p7_config.h"
 
