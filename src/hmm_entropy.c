@@ -856,8 +856,8 @@ hmm_entropy_CalculateSampling(P7_PROFILE *gm, P7_REFMX *fwd, ESL_RANDOMNESS *rng
 
 	*ret_H = esl_vec_DEntropy(q_samp, nalloc);
 	if (verbose) {
-		fprintf(stdout, "size of q_samp: %d\n", sizeof(q_samp));
-		fprintf(stdout, "n_elements of q_samp: %d\n", sizeof(q_samp) / sizeof(int));
+		fprintf(stdout, "size of q_samp: %lu\n", sizeof(q_samp));
+		fprintf(stdout, "n_elements of q_samp: %lu\n", sizeof(q_samp) / sizeof(int));
 		fprintf(stdout, "h->kalloc: %d\n", h->kalloc);
 		fprintf(stdout, "nalloc: %d\n", nalloc);
 		fprintf(stdout, "h->nkeys: %d\n", h->nkeys);
