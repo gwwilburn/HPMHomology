@@ -20,29 +20,32 @@
 #include <omp.h>
 
 /* declaration of internal functions */
-int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int A, int verbose);
+int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int user_R, int A, int verbose);
 
 
 static ESL_OPTIONS options[] = {
 	/* name         type         default  env range  togs   reqs  incomp         help                                                   docgroup */
-	{ "-h",         eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL, NULL,            "help; show brief info on version and usage",              0 },
-	{ "-s",         eslARG_INT,      "0", NULL, NULL, NULL, NULL, NULL,            "set random number seed to <n>",                           0 },
+	{ "-h",         eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL, NULL,            "help; show brief info on version and usage",                 0 },
+	{ "-s",         eslARG_INT,      "0", NULL, NULL, NULL, NULL, NULL,            "set random number seed to <n>",                              0 },
 
 	/* Options forcing which alphabet we're working in (normally autodetected) */
-   { "--amino",    eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                    1 },
-   { "--rna",      eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--dna,--amino",  "<seqfile> contains RNA sequences",                        1 },
-   { "--dna",      eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--rna,--amino",  "<seqfile> contains DNA sequences",                        1 },
+   { "--amino",    eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--dna,--rna",    "<seqfile> contains protein sequences",                       1 },
+   { "--rna",      eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--dna,--amino",  "<seqfile> contains RNA sequences",                           1 },
+   { "--dna",      eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL,"--rna,--amino",  "<seqfile> contains DNA sequences",                           1 },
 
 	/* options for bounding sequences we score */
-   { "--msastart", eslARG_INT,     "-1", NULL, NULL, NULL, NULL, NULL,            "Start sequence",                                          2 },
-   { "--msaend",   eslARG_INT,     "-2", NULL, NULL, NULL, NULL, NULL,            "End sequence",                                            2 },
+   { "--msastart", eslARG_INT,     "-1", NULL, NULL, NULL, NULL, NULL,            "Start sequence",                                             2 },
+   { "--msaend",   eslARG_INT,     "-2", NULL, NULL, NULL, NULL, NULL,            "End sequence",                                               2 },
 
+
+	/* options for bounding sequences we score */
+   { "-R", eslARG_INT,             "-1", NULL, NULL, NULL, NULL, NULL,            "Number of HMM paths sampled per sequence (2^(H+1)) default", 3 },
 
 	/* control of output */
-	{ "-A",         eslARG_OUTFILE, NULL, NULL, NULL, NULL, NULL, NULL,            "save multiple alignment of all hits to file <s>",         3 },
+	{ "-A",         eslARG_OUTFILE, NULL, NULL, NULL, NULL, NULL, NULL,            "save multiple alignment of all hits to file <s>",            4 },
 
 	/* debugging tools */
-   { "--v",        eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL, NULL,            "Verbose mode: print info on intermediate scoring steps",  4 },
+   { "--v",        eslARG_NONE,   FALSE, NULL, NULL, NULL, NULL, NULL,            "Verbose mode: print info on intermediate scoring steps",     5 },
 {  0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
@@ -75,6 +78,7 @@ int main(int argc, char **argv){
 	int               A             = 0;                         /* Boolean for output alignment */
 	int               start;
 	int               end;
+	int               R;
 	int               status;
 	char              errbuf[eslERRBUFSIZE];
 
@@ -92,6 +96,8 @@ int main(int argc, char **argv){
 		if ((afp      = fopen(esl_opt_GetString(go, "-A"), "w")) == NULL) p7_Fail("Failed to open alignment file %s for writing\n", esl_opt_GetString(go, "-A"));
 		A = 1;
   	}
+
+
 
 	/* read in hmm, autodetect alphabet if not manually set by user  */
 	if (p7_hmmfile_OpenE(hmmfile, NULL, &hmmfp, NULL) != eslOK) p7_Fail("Failed to open HMM file %s", hmmfile);
@@ -135,12 +141,17 @@ int main(int argc, char **argv){
 	/* total number of sequences we will be scoring */
 	totseq = end-start;
 
+	/* if user specifies set number of paths to sample, set that here */
+	R = -1;
+	if (esl_opt_GetInteger(go, "-R") > 0) R = esl_opt_GetInteger(go, "-R");
+	fprintf(stdout, "User specified R: %d\n", R);
+
 	/* set up score set object */
 	hpm_is_ss = hpm_is_scoreset_Create(totseq);
 
 
 	/* calculate importance sampling score for all seqs */
-	Calculate_IS_scores(hpm, hmm, sq, rng, totseq, hpm_is_ss, start, end, &msa, A, v);
+	Calculate_IS_scores(hpm, hmm, sq, rng, totseq, hpm_is_ss, start, end, &msa, R, A, v);
 
 	/* write hpm is scores to output csv */
 	if ((hpm_is_ss_fp = fopen(scorefile, "w")) == NULL) esl_fatal("Failed to open output hpm IS scoreset file %s for writing", scorefile);
@@ -171,7 +182,7 @@ int main(int argc, char **argv){
 
 
 /* outer loop over all sequences in seqfile */
-int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int A, int verbose) {
+int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng, int totseq, HPM_IS_SCORESET *hpm_is_ss, int start, int end, ESL_MSA **msa, int user_R, int A, int verbose) {
 
 
 	P7_BG          *bg        = NULL;
@@ -188,7 +199,7 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 	int             msaopts   = 0;
 	int             i,j;
 	int             r;                                      /* importance sample index                */
-	int             R         = 1;                          /* total number of samples per sequence   */
+	int             R;                          /* total number of samples per sequence   */
 	float           sc_ld;   				                    /* ln( Q( x, \pi) ) under an hpm          */
 	float           hsc;
 	float           esc;
@@ -246,17 +257,22 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 
 		/* calculate posterior entropy H(pi | x) */
 		hmm_entropy_CalculateHernando(gm, fwd, &H, -1, 0);
-		R = pow(2,ceil(H));
-		if (H > 17.0)
-		{
-			R = 130000;  /* approx 2^17 */
+		if (user_R > 0) R = user_R;
+		else {
+			R = pow(2,ceil(H));
+			if (H > 17.0)
+			{
+				R = 130000;  /* approx 2^17 */
+			}
+			else if (R < 1000) {
+				R = 1000;
+			}
+			if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
 		}
-		else if (R < 1000) {
-			R = 1000;
-		}
-		if (verbose) fprintf(stdout, "seq: %s, H: %.4f, R: %d\n", sq[i]->name, H, R);
 
-		double pr[R];
+		fprintf(stdout, "\tR for seq %d: %d\n", i, R);
+		double *pr;
+		ESL_ALLOC(pr,R*sizeof(double));
 
 
 		/* inner loop over sampled paths */
@@ -328,6 +344,10 @@ int Calculate_IS_scores(HPM *hpm, P7_HMM *hmm, ESL_SQ **sq, ESL_RANDOMNESS *rng,
 		hpm_is_ss->H[j]       = H;
 		hpm_is_ss->fwd[j]     = fsc-ntsc;
 		hpm_is_ss->is_ld[j]   = ld;
+
+		/* free pr */
+		free(pr);
+
 	}
 
 	/* if output msa requesed, create MSA from trace */
