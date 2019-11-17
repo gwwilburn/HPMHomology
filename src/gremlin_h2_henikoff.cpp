@@ -171,8 +171,8 @@ int main(int argc, const char * argv[]) {
 	}
 	// save mrf
 	if(!opt.mrf_o.empty()){
-		mrf.save(opt.mrf_o,msa,opt.only_v);
-		//mrf.saveRSC(opt.mrf_o,msa,opt.only_v);
+		//mrf.save(opt.mrf_o,msa,opt.only_v);
+		mrf.saveRSC(opt.mrf_o,msa,opt.only_v);
 
 	}
 	return 0;
