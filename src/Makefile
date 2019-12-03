@@ -16,7 +16,7 @@ CFLAGS = -Wall -g
 
 # targest for make
 
-all: hpm hpmfile hpm_scoreset hpm_trace potts pottsfile hpmscore hpmbuild hmm_scoreset hpm_scoreops hmm_entropy hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS hpmalign hpmemit
+all: hpm hpmfile hpm_scoreset hpm_trace potts pottsfile hpmscore hpmbuild hmm_scoreset hpm_scoreops hmm_entropy hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS hpmalign hpmemit hpmbuild_masked
 
 hpmscore: hpmscore.c
 	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
@@ -38,6 +38,9 @@ hpmalign: hpmalign.c
 
 hpmemit: hpmemit.c
 	${CC} ${CFLAGS} -o hpmemit ${IFLAGS} ${LFLAGS} ${LIBS} hpmemit.c hpm.o hpmfile.o hpm_scoreops.o ${SLIBS}
+
+hpmbuild_masked: hpmbuild_masked.c
+	${CC} ${CFLAGS} -o hpmbuild_masked ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild_masked.c hpm.o hpmfile.o potts.o ${SLIBS}
 
 hpm: hpm.c
 	${CC} ${CFLAGS} -c -o hpm.o ${IFLAGS} hpm.c
@@ -78,7 +81,7 @@ utest:
 	 ${CC} ${CFLAGS} -o hmm_entropy_utest ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c -DHMMENTROPY_TESTDRIVE ${SLIBS}
 
 clean:
-	rm -f hpmscore hpmbuild hpmemit hmmscore_uniglocal hmmalign_uniglocal hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign hpmscoreIS hpm_entropy_3mer hmm_entropy_msa hmm_entropy_utest
+	rm -f hpmscore hpmbuild hpmemit hmmscore_uniglocal hmmalign_uniglocal hpmbuild_masked hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o hpm_3mer hpmalign hpmscoreIS hpm_entropy_3mer hmm_entropy_msa hmm_entropy_utest
 
 
 
