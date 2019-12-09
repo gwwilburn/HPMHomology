@@ -11,8 +11,8 @@
 typedef struct potts_s{
 
 	int 				 L;			/* number of states in model              */
-	float         **h;         /* site-specific h_i params               */
-	float        ***e;         /* coupling e_ij params                   */
+	double        **h;         /* site-specific h_i params               */
+	double       ***e;         /* coupling e_ij params                   */
 
    ESL_ALPHABET   *abc;       /* alphabet                               */
 } POTTS;
@@ -20,6 +20,7 @@ typedef struct potts_s{
 /* potts.c */
 
 extern POTTS *potts_Create(int L, ESL_ALPHABET *abc);
+extern void   potts_Destroy(POTTS *potts);
 
 #endif
 

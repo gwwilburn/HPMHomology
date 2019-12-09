@@ -43,3 +43,48 @@ potts_Create(int L, ESL_ALPHABET *abc)
 		return NULL;
 
 }
+
+/* Function:  potts_Destroy()
+ * Synopsis:  Free a <POTTS> object
+ *
+ * Purpose: Frees the body of a <POTTS> object
+ *
+ * Note:    Based on p7_hmm_Destroy()
+ *
+ * Returns: (void).
+ */
+
+
+void
+potts_Destroy(POTTS *potts)
+{
+	int i, j;
+
+	if (potts == NULL) return;
+
+	/* free hi array */
+	if (potts->h && potts->L) {
+		for (i=0; i < potts->L; i++) {
+			if (potts->h[i]) free(potts->h[i]);
+		}
+		free(potts->h);
+	}
+
+	/* free eij array */
+	if (potts->e && potts->L) {
+		for (i=0; i < potts->L; i++) {
+			if (potts->e[i]) {
+				for (j=0; j < potts->L; j++) {
+					if (potts->e[i][j]) free(potts->e[i][j]);
+				}
+				free(potts->e[i]);
+			}
+		}
+		free(potts->e);
+	}
+
+	free(potts);
+
+	return;
+
+}
