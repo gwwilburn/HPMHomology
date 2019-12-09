@@ -200,7 +200,8 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
 	hpm->t[hpm->M][HPM_II] = hmm->t[0][hmm_II];
 
 
-
+	/* clean up and return */
+	free(mocc);
 	return hpm;
 
 	ERROR:

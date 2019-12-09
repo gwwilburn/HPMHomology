@@ -148,7 +148,6 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
 
 	ESL_FILEPARSER  *efp = NULL;
 	HPM 				 *ret_hpm = NULL;
-	int              status;
 	char 				 *tok;
 	int				  tok_count;
 	int 				  section_count = 0;
@@ -159,6 +158,7 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
 	int 				  l = 0; /* index for counting lines related to a given match state */
 	int				  a = 0; /* index for alphabet */
 	int 				  lc = 1;
+	int              status;
 
 	if (esl_fileparser_Open(f, NULL, &efp) != eslOK)  ESL_XFAIL(eslFAIL, errbuf, "file open failed");
 
@@ -296,9 +296,8 @@ hpmfile_ReadDummy(char *f, ESL_ALPHABET *abc, char *errbuf) {
 
 	ESL_FILEPARSER  *efp = NULL;
 	HPM 				 *ret_hpm = NULL;
-	int              status;
 	int				  t = 1;
-
+	int              status;
 
 	if (esl_fileparser_Open(f, NULL, &efp) != eslOK)  ESL_XFAIL(eslFAIL, errbuf, "file open failed");
 

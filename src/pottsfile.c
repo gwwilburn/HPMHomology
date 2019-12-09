@@ -18,7 +18,6 @@ pottsfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf){
 
 	ESL_FILEPARSER  *efp           = NULL;
 	POTTS           *ret_potts     = NULL;
-	int              status;
 	char            *tok;
 	char            *prev_tok      = "blargh";
 	int              tok_count;
@@ -28,6 +27,7 @@ pottsfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf){
 	int              a;                        /* alphabet index           */
 	int              lc            = 0;		    /* line counter             */
 	int				  section_count = 0;
+	int              status;
 
 	if (esl_fileparser_Open(f, NULL, &efp) != eslOK)  ESL_XFAIL(eslFAIL, errbuf, "file open failed");
 
