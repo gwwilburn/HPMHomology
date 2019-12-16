@@ -1,6 +1,6 @@
-#usefull directories
-ESLDIR = ../lib/hmmer/easel
-HMMERDIR = ../lib/hmmer/src
+#useful directories
+ESLDIR = ../../hmmer4/easel
+HMMERDIR = ../../hmmer4/src
 
 #variables that I will run
 INCLUDES = -I${HMMERDIR} -I${ESLDIR}
