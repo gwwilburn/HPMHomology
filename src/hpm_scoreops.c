@@ -366,11 +366,7 @@ int hpm_scoreops_ScorePath(const H4_PATH *pi, const ESL_DSQ *dsq, const HPM *hpm
    return eslOK;
 }
 
-/*****************************************************************
- * h4-compatible scoring functions
-*****************************************************************/
-
-/* Function:  hpm_scoreops_PathScore()
+/* Function:  hpm_scoreops_ScorePathTransitions()
  * Synopsis:  Calculate transition score of a path under an HPM.
  *
  * Purpose:   Calculate the transition score of path <pi> under
