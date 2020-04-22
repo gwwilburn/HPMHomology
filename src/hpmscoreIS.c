@@ -25,10 +25,8 @@
 /* HPMHomology includes */
 #include "hpm.h"
 #include "hpmfile.h"
-#include "hmm_entropy.h"
 #include "hpm_scoreset.h"
 #include "hpm_scoreops.h"
-#include "hpm_trace.h"
 #include "h4_path_hpm.h"
 #include "h4_pathalign.h"
 
@@ -193,7 +191,7 @@ int main(int argc, char **argv) {
    status = esl_sqfile_OpenDigital(abc, seqfile, format, NULL, &sqfp);
    if      (status == eslENOTFOUND) esl_fatal("No such file.");
    else if (status == eslEFORMAT)   esl_fatal("Format unrecognized.");
-   else if (status ==eslEINVAL)     esl_fatal("Can't autodetect stdin or .gz.");
+   else if (status == eslEINVAL)    esl_fatal("Can't autodetect stdin or .gz.");
    else if (status != eslOK)        esl_fatal("Open failed, code %d.", status);
 
    /* read sequences into array */
