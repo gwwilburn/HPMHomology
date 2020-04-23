@@ -6,6 +6,7 @@
 #include "hmmer.h"
 #include "easel.h"
 #include "esl_alphabet.h"
+#include "esl_arr2.h"
 #include "esl_composition.h"
 #include "esl_vectorops.h"
 #include "potts.h"
@@ -406,10 +407,10 @@ hmm_entropy_Calculate(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int verbose)
 	if (verbose) fprintf(stdout, "Total entropy: %f\n", 1.44269504*dpc[p7R_C]);
 
 	p7_refmx_Destroy(ent);
-	free(G);
-	free(g);
-	free(Gx);
-	free(gx);
+        esl_arr2_Destroy((void **) G, NSG);
+        esl_arr2_Destroy((void **) g, NSG);
+        esl_arr2_Destroy((void **) Gx, NSx);
+        esl_arr2_Destroy((void **) gx, NSx);
 
 	return eslOK;
 
@@ -773,11 +774,13 @@ hmm_entropy_CalculateHernando(P7_PROFILE *gm, P7_REFMX *fwd, float *ret_H, int o
 
 	if (verbose) fprintf(stdout, "Total entropy: %f\n", 1.44269504*dpc[p7R_C]);
 
+        /* clean up and return */
 	p7_refmx_Destroy(ent);
-	free(G);
-	free(g);
-	free(Gx);
-	free(gx);
+        esl_arr2_Destroy((void **) G, NSG);
+        esl_arr2_Destroy((void **) g, NSG);
+        esl_arr2_Destroy((void **) Gx, NSx);
+        esl_arr2_Destroy((void **) gx, NSx);
+
 
 	return eslOK;
 
