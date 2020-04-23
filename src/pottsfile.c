@@ -11,7 +11,7 @@
 #include "pottsfile.h"
 #include "potts.h"
 
-/* Function:  esl_msafile_Read()
+/* Function:  pottsfile_Read()
  * Synopsis:  Read Potts model from input
  *
  * Purpose:   Reads potts model from <f>, returns it.
