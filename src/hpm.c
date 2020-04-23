@@ -161,11 +161,10 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
    /* check to make sure alphabets are equal */
    if (potts->abc != hmm->abc) p7_Fail("Potts alphabet and hmm alphabet do not match!\n", potts->L, hmm->M);
 
-   ESL_ALLOC(hpm, sizeof(HPM));
    ESL_ALLOC(mocc, sizeof(float)*(hmm->M+1));
 
    /* create hpm with appropriate  number of match states */
-   hpm = hpm_Create(hmm->M, potts->abc);
+   hpm = hpm_Create(hmm->M, abc);
 
    /* copy insert emission from hmm as-is */
    /* this throws an error for now */
@@ -257,10 +256,6 @@ hpm_Create_3mer(ESL_ALPHABET *abc) {
    int   idx;                 /* alphabet index for eij's  */
    int   idx2;                /* alphabet index for eij's  */
    int   Kg      = abc->K+1;  /* alphabet size w/ gap      */
-   int   status;
-
-   /* allocate memory for hpm */
-   ESL_ALLOC(hpm, sizeof(HPM));
 
    /* create hpm with 3 match states */
    hpm = hpm_Create(M, abc);
@@ -316,8 +311,6 @@ hpm_Create_3mer(ESL_ALPHABET *abc) {
    hpm->t[3][HPM_II] = 0.0;
 
    return hpm;
-   ERROR:
-      return NULL;
 }
 
 
