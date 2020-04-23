@@ -12,7 +12,7 @@
 /* Function:  hpm_Create()
  * Synopsis:  Allocate a new <HPM>
  *
- * Purpose:   Allocate a <P7_HMM> of <M> nodes, for symbol
+ * Purpose:   Allocate a <HPM> of <M> nodes, for symbol
  *            alphabet <abc>, and return a pointer to it.
  *
  * Note:      Based on p7_hmm_Create()
