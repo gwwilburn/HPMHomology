@@ -121,16 +121,18 @@ int main(int argc, char *argv[]) {
    /* Open the .hmm file */
    status = p7_hmmfile_OpenE(hmmfile, NULL, &hfp, errbuf);
    /* error handling below copied from hmmsearch */
-   if      (status == eslENOTFOUND) p7_Fail("File existence/permissions problem in trying to open HMM file %s.\n%s\n", hmmfile, errbuf);
-   else if (status == eslEFORMAT)   p7_Fail("File format problem in trying to open HMM file %s.\n%s\n",                hmmfile, errbuf);
-   else if (status != eslOK)        p7_Fail("Unexpected error %d in opening HMM file %s.\n%s\n",               status, hmmfile, errbuf);
+   if      (status == eslENOTFOUND) esl_fatal("File existence/permissions problem in trying to open HMM file %s.\n%s\n", hmmfile, errbuf);
+   else if (status == eslEFORMAT)   esl_fatal("File format problem in trying to open HMM file %s.\n%s\n",                hmmfile, errbuf);
+   else if (status != eslOK)        esl_fatal("Unexpected error %d in opening HMM file %s.\n%s\n",               status, hmmfile, errbuf);
 
    /* read the .hmm file */
    status = p7_hmmfile_Read(hfp, &abc, &hmm);
+   if (status != eslOK) esl_fatal("ERROR reading hmm, returned code %d\n", status);
    p7_hmmfile_Close(hfp);
 
    /* read the potts file */
    potts = pottsfile_Read(pottsfile, abc, errbuf);
+   if (potts == NULL) esl_fatal("Error reading potts file %s\n", pottsfile);
 
    /* combine hmm and potts object to create hpm object */
    hpm = hpm_Create_hmm_potts(hmm, potts, abc);
