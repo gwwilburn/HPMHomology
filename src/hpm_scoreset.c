@@ -9,7 +9,7 @@
 
 #include <string.h>
 
-/* Function ahpm_scoreset_Create()
+/* Function  hpm_scoreset_Create()
  *
  * Synopsis: Allocate score set object for original (viterbi path) hpm scoring method
  *
@@ -91,7 +91,7 @@ hpm_is_scoreset_Create(int nseq)
    ESL_ALLOC(hpm_is_ss->R,           sizeof(int)   * nseq);
    ESL_ALLOC(hpm_is_ss->H,           sizeof(float) * nseq);
    ESL_ALLOC(hpm_is_ss->fwd,         sizeof(float) * nseq);
-   ESL_ALLOC(hpm_is_ss->is_ld,       sizeof(float) * nseq);
+   ESL_ALLOC(hpm_is_ss->is_ld,       sizeof(double) * nseq);
 
    for (n = 0; n < nseq; n++) {
       hpm_is_ss->R[n]         = 0;
@@ -199,12 +199,13 @@ int
 hpm_is_scoreset_Write(FILE *fp, HPM_IS_SCORESET *hpm_is_ss){
    int n; /* sequence index */
 
+
    /* write csv header line */
    fprintf(fp,"id,N_sample,path_ent,fwd_logodds,HPM_IS_logodds\n");
 
    /* loop over sequences, print id and scores */
    for (n = 0; n < hpm_is_ss->nseq; n++) {
-      fprintf(fp, "%s,%d,%.4f,%.4f,%.4f\n",
+      fprintf(fp, "%s,%d,%.4f,%.4f,%4f\n",
               hpm_is_ss->sqname[n],
               hpm_is_ss->R[n],
               hpm_is_ss->H[n],

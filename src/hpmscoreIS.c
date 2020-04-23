@@ -315,8 +315,8 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
    float           hpmsc_ld;                                /* hpm unnormalized log odds S*(x, pi), in bits  */
    float           hpmsc_max;                               /* best hpm log odds S*(x, pi) for all paths     */
    float           ldprev;                                  /* previous IS log-odds score                    */
-   float           ld;                                      /* importance sampling log odds score S*(x)      */
-   float           ls;                                      /* log of importance sampling sum                */
+   double          ld;                                      /* importance sampling log odds score S*(x)      */
+   double          ls;                                      /* log of importance sampling sum                */
    double         *pr, *pr_unsorted;                        /* terms in importance sampling sum              */
    int             status;                                  /* easel return code                             */
    //char            errbuf[eslERRBUFSIZE];                   /* buffer for easel errors                       */
@@ -459,6 +459,7 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       esl_vec_DSortIncreasing(pr, R);
 
       /* run log sum */
+      ls = esl_vec_DLog2Sum(pr, R);
       ld = (fsc / eslCONST_LOG2R) - logf(R) + ls;
 
       /* add scoring info to scoreset object */
@@ -467,7 +468,6 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       hpm_is_ss->H[j]      = -1.0;
       hpm_is_ss->fwd[j]    = (fsc - mo->nullsc) / eslCONST_LOG2R;
       hpm_is_ss->is_ld[j]   = ld;
-
 
    }
 

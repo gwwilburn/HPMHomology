@@ -30,7 +30,7 @@ typedef struct hpmisscoreset_s{
    int     *R;             /* number of stochastic traces                            */
    float   *H;             /* Posterior path entropies H(pi | x)                     */
    float   *fwd;           /* forward log-odds scores                                */
-   float   *is_ld;         /* unnormalized importance sampling log-odds scores       */
+   double  *is_ld;         /* unnormalized importance sampling log-odds scores       */
 
 } HPM_IS_SCORESET;
 
