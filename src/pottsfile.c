@@ -11,7 +11,17 @@
 #include "pottsfile.h"
 #include "potts.h"
 
-/* Read in a potts file (from RScape), return a potts object */
+/* Function:  esl_msafile_Read()
+ * Synopsis:  Read Potts model from input
+ *
+ * Purpose:   Reads potts model from <f>, returns it.
+ *
+ * Args:      f      - input file
+ *            abc    - esl alphabet to assign to Potts model
+ *            errbuf - memory for error messages
+ *
+ * Returns:   potts model <ret_potts>
+ */
 
 POTTS *
 pottsfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf){
