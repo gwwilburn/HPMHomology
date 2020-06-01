@@ -90,7 +90,7 @@ utest:
 	 ${CC} ${CFLAGS} -o hmm_entropy_utest ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c -DHMMENTROPY_TESTDRIVE ${SLIBS}
 
 clean:
-	rm -f hpmscore hpmbuild hpmemit hmmscore_uniglocal hmmalign_uniglocal hpmbuild_masked hpmscore_path hpmscoreIS hpmalign hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o hmm_scoreset.o hpm_scoreops.o hpm_trace.o hmm_entropy.o h4_path_hpm.o h4_pathalign.o hpm_3mer  hpm_entropy_3mer hmm_entropy_msa hmm_entropy_utest
+	rm -f hpm.o hpmfile.o hpm_scoreset.o hpm_scoreops.o  hpm_trace.o potts.o pottsfile.o hmm_scoreset.o hmm_entropy.o h4_path_hpm.o h4_pathalign.o hpmscore hpmbuild  hmmscore_uniglocal  hmmalign_uniglocal hpmscoreIS hpmscore_path hpmalign  hpmemit hpmbuild_masked hpm_3mer hmm_entropy_3mer hmm_entropy_msa hmm_entropy_utest
 
 
 
