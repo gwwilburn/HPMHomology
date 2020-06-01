@@ -584,7 +584,7 @@ int find_jumps(double *pr_unsorted, int r, int R_batch, ESL_SQ *sq, H4_PATH **pi
       ld = fsc - log2f(s+1) + ls;
 
       /* put path that causes jump in an output MSA file */
-      if (abs(ld-ldprev) > 0.25) {
+      if (fabsf(ld-ldprev) > 0.25) {
 
          /* calculate HMM score of this seq and sampled path */
          h4_path_Score(pi[t], sq->dsq, hmm, mo, &hmmsc_ld);

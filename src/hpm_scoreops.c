@@ -21,8 +21,8 @@ int hpm_scoreops_CalculateHamiltonian(HPM *hpm, P7_TRACE *tr, ESL_DSQ *dsq, floa
    int   y;         /* index for trace elements                   */
    int   i;         /* match state index                          */
    int   j;         /* match state index                          */
-   int   a;         /* residue index                              */
-   int   b;         /* residue index                              */
+   int   a = 0;     /* residue index                              */
+   int   b = 0;     /* residue index                              */
    int   idx;       /* index for potts parameters                 */
    float hsc = 0;   /* Hamiltonian contribution from h_i's        */
    float esc = 0;   /* Hamiltonian contribution from e_ij's       */
@@ -87,10 +87,10 @@ int hpm_scoreops_CalculateHamiltonianSingleSite(HPM *hpm, P7_TRACE *tr, ESL_DSQ 
    int   y;           /* index for trace elements                   */
    int   z;           /* index for trace elements                   */
    int   j;           /* match state index                          */
-   int   a;           /* residue index                              */
-   int   b;           /* residue index                              */
+   int   a = 0;       /* residue index                              */
+   int   b = 0;       /* residue index                              */
    int   idx;         /* index for potts parameters                 */
-   float Ei = 0.0;   /* Hamiltonian contribution for site i        */
+   float Ei = 0.0;    /* Hamiltonian contribution for site i        */
    int K = hpm->abc->K;
 
 	//fprintf(stdout, "\t in hpm_scoreops_CalculateHamiltonianSingleSite()\n");
