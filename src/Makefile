@@ -15,7 +15,7 @@ SLIBS    = ${HMMERDIR}/libhmmer.a ${H4DIR}/libhmmer.a ${ESLDIR}/libeasel.a
 CC = gcc
 CFLAGS = -Wall -g
 
-# targest for make
+# targets for make
 
 all: hpm hpmfile hpm_scoreset hpm_trace potts pottsfile hpmscore hpmbuild hmm_scoreset hpm_scoreops hmm_entropy h4_path_hpm h4_pathalign hmmscore_uniglocal hmmalign_uniglocal hpmscoreIS hpmscore_path hpmalign hpmemit hpmbuild_masked
 
@@ -53,41 +53,41 @@ h4_pathalign: h4_pathalign.c
 	${CC} ${CFLAGS} -c -o h4_pathalign.o ${IFLAGS} h4_pathalign.c
 
 hpmscore: hpmscore.c
-	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmscore ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmscore.c hpm.o hpmfile.o hpm_scoreset.o potts.o pottsfile.o
 
 hpmbuild: hpmbuild.c
-	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild.c hpm.o hpmfile.o potts.o pottsfile.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmbuild ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmbuild.c hpm.o hpmfile.o potts.o pottsfile.o
 
 hmmscore_uniglocal: hmmscore_uniglocal.c
-	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmscore_uniglocal.c hmm_scoreset.o ${SLIBS}
+	${CC} ${CFLAGS} -o hmmscore_uniglocal ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hmmscore_uniglocal.c hmm_scoreset.o
 
 hmmalign_uniglocal: hmmalign_uniglocal.c
-	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${LIBS} hmmalign_uniglocal.c ${SLIBS}
+	${CC} ${CFLAGS} -o hmmalign_uniglocal ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hmmalign_uniglocal.c
 
 hpmscoreIS: hpmscoreIS.c
-	${CC} ${CFLAGS} -o hpmscoreIS ${IFLAGS} ${LFLAGS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hpm_scoreops.o hpm_scoreset.o h4_path_hpm.o h4_pathalign.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmscoreIS ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmscoreIS.c hpm.o hpmfile.o potts.o pottsfile.o hpm_scoreops.o hpm_scoreset.o h4_path_hpm.o h4_pathalign.o
 
 hpmscore_path: hpmscore_path.c
-	${CC} ${CFLAGS} -o hpmscore_path ${IFLAGS} ${LFLAGS} ${LIBS} hpmscore_path.c hpm.o hpmfile.o hpm_scoreops.o h4_path_hpm.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmscore_path ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmscore_path.c hpm.o hpmfile.o hpm_scoreops.o h4_path_hpm.o
 
 hpmalign: hpmalign.c
-	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_trace.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmalign ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmalign.c hpm.o hpmfile.o potts.o pottsfile.o hmm_entropy.o hpm_scoreops.o hpm_trace.o
 
 hpmemit: hpmemit.c
-	${CC} ${CFLAGS} -o hpmemit ${IFLAGS} ${LFLAGS} ${LIBS} hpmemit.c hpm.o hpmfile.o hpm_scoreops.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmemit ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmemit.c hpm.o hpmfile.o hpm_scoreops.o
 
 hpmbuild_masked: hpmbuild_masked.c
-	${CC} ${CFLAGS} -o hpmbuild_masked ${IFLAGS} ${LFLAGS} ${LIBS} hpmbuild_masked.c hpm.o hpmfile.o potts.o ${SLIBS}
+	${CC} ${CFLAGS} -o hpmbuild_masked ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpmbuild_masked.c hpm.o hpmfile.o potts.o
 
 3mer:
-	 ${CC} ${CFLAGS} -o hpm_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hpm.c ${DFLAGS} hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS}
-	 ${CC} ${CFLAGS} -o hmm_entropy_3mer ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c ${DFLAGS} ${SLIBS}
+	 ${CC} ${CFLAGS} -o hpm_3mer ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hpm.c ${DFLAGS} hpmfile.o hpm_scoreset.o potts.o pottsfile.o
+	 ${CC} ${CFLAGS} -o hmm_entropy_3mer ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hmm_entropy.c ${DFLAGS} ${SLIBS}
 
 entropy_msa:
-	${CC} ${CFLAGS} -o hmm_entropy_msa ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c  -DENTROPY_MSA ${SLIBS}
+	${CC} ${CFLAGS} -o hmm_entropy_msa ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hmm_entropy.c  -DENTROPY_MSA
 
 utest:
-	 ${CC} ${CFLAGS} -o hmm_entropy_utest ${IFLAGS} ${LFLAGS} ${LIBS} hmm_entropy.c -DHMMENTROPY_TESTDRIVE ${SLIBS}
+	 ${CC} ${CFLAGS} -o hmm_entropy_utest ${IFLAGS} ${LFLAGS} ${SLIBS} ${LIBS} hmm_entropy.c -DHMMENTROPY_TESTDRIVE
 
 clean:
 	rm -f hpm.o hpmfile.o hpm_scoreset.o hpm_scoreops.o  hpm_trace.o potts.o pottsfile.o hmm_scoreset.o hmm_entropy.o h4_path_hpm.o h4_pathalign.o hpmscore hpmbuild  hmmscore_uniglocal  hmmalign_uniglocal hpmscoreIS hpmscore_path hpmalign  hpmemit hpmbuild_masked hpm_3mer hmm_entropy_3mer hmm_entropy_msa hmm_entropy_utest
