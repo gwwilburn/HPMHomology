@@ -9,6 +9,7 @@
 #include "p7_config.h"
 #include "easel.h"
 #include "esl_alphabet.h"
+#include "esl_vectorops.h"
 #include "potts.h"
 
 enum hpm_transitions {
@@ -29,7 +30,9 @@ enum hpm_transitions {
 typedef struct hpm_s{
    int              M;            /* number of nodes in model            */
    double         **t;            /* transition probs                    */
+   double         **lt;           /* transition log probs                */
    double         **ins;          /* insert emission probs               */
+   double         **lins;         /* insert emission log probs           */
    float          **h;            /* site-specific h_i params            */
    float         ***e;            /* coupling e_ij params                */
    int              nTransition;  /* number of transitions, should be 4  */

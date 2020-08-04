@@ -13,7 +13,9 @@ SLIBS    = ${HMMERDIR}/libhmmer.a ${H4DIR}/libhmmer.a ${ESLDIR}/libeasel.a
 
 #compiler information
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -O3
+#CFLAGS = -Wall -pg -g
+#CFLAGS = -Wall -g
 
 # targets for make
 
@@ -78,6 +80,7 @@ hpmemit: hpmemit.c
 
 hpmbuild_masked: hpmbuild_masked.c
 	${CC} ${CFLAGS} -o hpmbuild_masked ${IFLAGS} ${LFLAGS} hpmbuild_masked.c hpm.o hpmfile.o potts.o ${SLIBS} ${LIBS}
+
 
 3mer:
 	 ${CC} ${CFLAGS} -o hpm_3mer ${IFLAGS} ${LFLAGS} hpm.c ${DFLAGS} hpmfile.o hpm_scoreset.o potts.o pottsfile.o ${SLIBS} ${LIBS}

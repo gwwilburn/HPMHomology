@@ -6,6 +6,7 @@
 #include "easel.h"
 #include "esl_alphabet.h"
 #include "esl_composition.h"
+#include "esl_vectorops.h"
 #include "potts.h"
 
 
@@ -23,7 +24,8 @@
 HPM *
 hpm_Create(int M, ESL_ALPHABET *abc)
 {
-   int   Kg          = abc->K+1;  /* alphabet size w/ gaps                    */
+   int   K           = abc->K;    /* alphabet size                            */
+   int   Kg          = K+1;       /* alphabet size w/ gaps                    */
    int   Kg2 	     = Kg*Kg;     /* (alphabet size w/ gaps) ** 2             */
    int   nTransition = 4;         /* number of transition parameters per node */
    HPM  *hpm         = NULL;      /* hpm to return                            */
@@ -31,39 +33,50 @@ hpm_Create(int M, ESL_ALPHABET *abc)
    int   i;                       /* Potts site index                         */
    int   j;                       /* Potts site index                         */
    int   k;                       /* hpm node index                           */
-   int   l;                       /* character index                          */
 
    ESL_ALLOC(hpm, sizeof(HPM));
-
 
    hpm->M   = M;
    hpm->abc = abc;
    hpm->nTransition = nTransition;
 
-
    /* allocate memory for transition and insert emission params */
 
    /* level 1 */
-   ESL_ALLOC(hpm->t,   (M+1) * sizeof(double *));
-   ESL_ALLOC(hpm->ins, (M+1) * sizeof(double *));
-   hpm->t[0]   = NULL;
-   hpm->ins[0] =  NULL;
+   ESL_ALLOC(hpm->t,    (M+1) * sizeof(double *));
+   ESL_ALLOC(hpm->lt,   (M+1) * sizeof(double *));
+   ESL_ALLOC(hpm->ins,  (M+1) * sizeof(double *));
+   ESL_ALLOC(hpm->lins, (M+1) * sizeof(double *));
+   hpm->t[0]    = NULL;
+   hpm->lt[0]   = NULL;
+   hpm->ins[0]  = NULL;
+   hpm->lins[0] = NULL;
 
    /* level 2 */
-   ESL_ALLOC(hpm->t[0],   (nTransition*(M+1)) * sizeof(double));
-   ESL_ALLOC(hpm->ins[0], ((abc->K)*(M+1))    * sizeof(double));
+   ESL_ALLOC(hpm->t[0],    (nTransition*(M+1)) * sizeof(double));
+   ESL_ALLOC(hpm->lt[0],   (nTransition*(M+1)) * sizeof(double));
+   ESL_ALLOC(hpm->ins[0],  ((K)*(M+1))         * sizeof(double));
+   ESL_ALLOC(hpm->lins[0], ((K)*(M+1))         * sizeof(double));
+
+   esl_vec_DSet(hpm->t[0], (nTransition*(M+1)), 0.0);
+   esl_vec_DSet(hpm->lt[0], (nTransition*(M+1)), -eslINFINITY);
 
    for (k = 0; k < M+1; k++) {
-      hpm->t[k]   = hpm->t[0]   + (k * nTransition);
-      hpm->ins[k] = hpm->ins[0] + (k * hpm->abc->K);
+      hpm->t[k]    =  hpm->t[0]   + (k * nTransition);
+      hpm->lt[k]    = hpm->lt[0]   + (k * nTransition);
+      hpm->ins[k]  = hpm->ins[0]  + (k * K);
+      hpm->lins[k] = hpm->lins[0] + (k * K);
       if (abc->type == eslAMINO) {
          esl_composition_SW50(hpm->ins[k]);
       }
       else {
-         for (l=0; l < abc->K; l++){
-            hpm->ins[k][l] = 0.25;
-         }
+         esl_vec_DSet(hpm->ins[k], K, 0.25);
       }
+
+      /* set log insert emission  vector */
+      esl_vec_DCopy(hpm->ins[k], K, hpm->lins[k]);
+      esl_vec_DLog(hpm->lins[k], K);
+
    }
 
    /* allocate memory for potts params */
@@ -101,8 +114,10 @@ hpm_Destroy(HPM *hpm)
 
    if (hpm == NULL) return;
 
-   if (hpm->ins) {  if (hpm->ins[0]) free(hpm->ins[0]); free(hpm->ins); }
-   if (hpm->t)   {  if (hpm->t[0])   free(hpm->t[0]);   free(hpm->t);   }
+   if (hpm->ins)  {  if (hpm->ins[0])  free(hpm->ins[0]);  free(hpm->ins);  }
+   if (hpm->lins) {  if (hpm->lins[0]) free(hpm->lins[0]); free(hpm->lins); }
+   if (hpm->t)    {  if (hpm->t[0])    free(hpm->t[0]);    free(hpm->t);    }
+   if (hpm->lt)   {  if (hpm->lt[0])   free(hpm->lt[0]);   free(hpm->lt);   }
 
    /* free hi array */
    if (hpm->h && hpm->M) {
@@ -203,24 +218,36 @@ hpm_Create_hmm_potts(P7_HMM *hmm, POTTS *potts, ESL_ALPHABET *abc) {
    p7_hmm_CalculateOccupancy(hmm, mocc, NULL);
 
    /* transitions from begin state */
-   hpm->t[0][HPM_MM] = hmm->t[0][hmm_MM] + hmm->t[0][hmm_MD];
-   hpm->t[0][HPM_MI] = hmm->t[0][hmm_MI];
-   hpm->t[0][HPM_IM] = hmm->t[0][hmm_IM];
-   hpm->t[0][HPM_II] = hmm->t[0][hmm_II];
+   hpm->t[0][HPM_MM]  = hmm->t[0][hmm_MM] + hmm->t[0][hmm_MD];
+   hpm->lt[0][HPM_MM] = log(hpm->t[0][HPM_MM]);
+   hpm->t[0][HPM_MI]  = hmm->t[0][hmm_MI];
+   hpm->lt[0][HPM_MI] = log(hpm->lt[0][HPM_MI]);
+   hpm->t[0][HPM_IM]  = hmm->t[0][hmm_IM];
+   hpm->lt[0][HPM_IM] = log(hpm->t[0][HPM_IM]);
+   hpm->t[0][HPM_II]  = hmm->t[0][hmm_II];
+   hpm->lt[0][HPM_II] = log(hpm->t[0][HPM_II]);
 
    /* intermediate transitions */
    for (i = 1; i < hpm->M; i++) {
-      hpm->t[i][HPM_MM] = ((hmm->t[i][hmm_MM] + hmm->t[i][hmm_MD]) * mocc[i]) + (1.0 - mocc[i]);
-      hpm->t[i][HPM_MI] = hmm->t[i][hmm_MI] * mocc[i];
-      hpm->t[i][HPM_IM] = hmm->t[i][hmm_IM];
-      hpm->t[i][HPM_II] = hmm->t[i][hmm_II];
+      hpm->t[i][HPM_MM]  = ((hmm->t[i][hmm_MM] + hmm->t[i][hmm_MD]) * mocc[i]) + (1.0 - mocc[i]);
+      hpm->lt[i][HPM_MM] = log(hpm->t[i][HPM_MM]);
+      hpm->t[i][HPM_MI]  = hmm->t[i][hmm_MI] * mocc[i];
+      hpm->lt[i][HPM_MI] = log(hpm->t[i][HPM_MI]);
+      hpm->t[i][HPM_IM]  = hmm->t[i][hmm_IM];
+      hpm->lt[i][HPM_IM] = log(hmm->t[i][hmm_IM]);
+      hpm->t[i][HPM_II]  = hmm->t[i][hmm_II];
+      hpm->lt[i][HPM_II] = log(hpm->t[i][HPM_II]);
    }
 
    /* transitions into end state */
-   hpm->t[hpm->M][HPM_MM] = (hmm->t[hpm->M][hmm_MM] * mocc[i]) + (1.0 - mocc[i]);
-   hpm->t[hpm->M][HPM_MI] = mocc[i]*hmm->t[0][hmm_MI];
-   hpm->t[hpm->M][HPM_IM] = hmm->t[0][hmm_IM];
-   hpm->t[hpm->M][HPM_II] = hmm->t[0][hmm_II];
+   hpm->t[hpm->M][HPM_MM]  = (hmm->t[hpm->M][hmm_MM] * mocc[i]) + (1.0 - mocc[i]);
+   hpm->lt[hpm->M][HPM_MM] = log(hpm->t[hpm->M][HPM_MM]);
+   hpm->t[hpm->M][HPM_MI]  = mocc[i]*hmm->t[0][hmm_MI];
+   hpm->lt[hpm->M][HPM_MI] = log(hpm->t[hpm->M][HPM_MI]);
+   hpm->t[hpm->M][HPM_IM]  = hmm->t[0][hmm_IM];
+   hpm->lt[hpm->M][HPM_IM] = log(hpm->t[hpm->M][HPM_IM]);
+   hpm->t[hpm->M][HPM_II]  = hmm->t[0][hmm_II];
+   hpm->lt[hpm->M][HPM_II] = log(hpm->t[hpm->M][HPM_II]);
 
 
    /* clean up and return */
@@ -287,28 +314,44 @@ hpm_Create_3mer(ESL_ALPHABET *abc) {
    /* set transition parameters by hand */
 
    /* node 0 */
-   hpm->t[0][HPM_MM] = 1.0;
-   hpm->t[0][HPM_MI] = 0.0;
-   hpm->t[0][HPM_IM] = 1.0;
-   hpm->t[0][HPM_II] = 0.0;
+   hpm->t[0][HPM_MM]  = 1.0;
+   hpm->lt[0][HPM_MM] = 0.0;
+   hpm->t[0][HPM_MI]  = 0.0;
+   hpm->lt[0][HPM_MI] = -eslINFINITY;
+   hpm->t[0][HPM_IM]  = 1.0;
+   hpm->lt[0][HPM_IM] = 0.0;
+   hpm->t[0][HPM_II]  = 0.0;
+   hpm->lt[0][HPM_II] = -eslINFINITY;
 
    /* node 1*/
-   hpm->t[1][HPM_MM] = 0.9;
-   hpm->t[1][HPM_MI] = 0.1;
-   hpm->t[1][HPM_IM] = 0.7;
-   hpm->t[1][HPM_II] = 0.3;
+   hpm->t[1][HPM_MM]  = 0.9;
+   hpm->lt[1][HPM_MM] = log(0.9);
+   hpm->t[1][HPM_MI]  = 0.1;
+   hpm->lt[1][HPM_MI] = log(0.1);
+   hpm->t[1][HPM_IM]  = 0.7;
+   hpm->lt[1][HPM_IM] = log(0.7);
+   hpm->t[1][HPM_II]  = 0.3;
+   hpm->lt[1][HPM_II] = log(0.3);
 
    /* node 2 */
-   hpm->t[2][HPM_MM] = 0.8;
-   hpm->t[2][HPM_MI] = 0.2;
-   hpm->t[2][HPM_IM] = 0.5;
-   hpm->t[2][HPM_II] = 0.5;
+   hpm->t[2][HPM_MM]  = 0.8;
+   hpm->lt[2][HPM_MM] = log(0.8);
+   hpm->t[2][HPM_MI]  = 0.2;
+   hpm->lt[2][HPM_MI] = log(0.2);
+   hpm->t[2][HPM_IM]  = 0.5;
+   hpm->lt[2][HPM_IM] = log(0.5);
+   hpm->t[2][HPM_II]  = 0.5;
+   hpm->lt[2][HPM_II] = log(0.5);
 
    /* node 3 */
-   hpm->t[3][HPM_MM] = 1.0;
-   hpm->t[3][HPM_MI] = 0.0;
-   hpm->t[3][HPM_IM] = 1.0;
-   hpm->t[3][HPM_II] = 0.0;
+   hpm->t[3][HPM_MM]  = 1.0;
+   hpm->lt[3][HPM_MM] = 0.0;
+   hpm->t[3][HPM_MI]  = 0.0;
+   hpm->lt[3][HPM_MI] = -eslINFINITY;
+   hpm->t[3][HPM_IM]  = 1.0;
+   hpm->lt[3][HPM_IM] = 0.0;
+   hpm->t[3][HPM_II]  = 0.0;
+   hpm->lt[3][HPM_II] = -eslINFINITY;
 
    return hpm;
 }

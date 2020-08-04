@@ -583,21 +583,38 @@ int  hpm_scoreops_ScorePathTransitions(const H4_PATH *pi, const ESL_DSQ *dsq, co
 
 
 int hpm_scoreops_ScoreMatchSeq(int *matseq, const HPM *hpm, float *ret_hsc, float *ret_esc, float *ret_nmsc) {
-   float hsc  = 0.;
-   float esc  = 0.;
-   float nmsc = 0.;
-   int   idx;
-   int   k,l;       /* match state index */
+   float   hsc  = 0.;            /* sum of h_k Potts terms            */
+   float   esc  = 0.;            /* sum of e_{kl} Potts terms         */
+   float   nmsc = 0.;            /* sum of null match emission scores */
+   float **ek;                   /* ptr to hpm->e[k], for hoisting    */
+   int     idx;                  /* Super-index for hpm->e[k][l]      */
+   int     k,l;                  /* match state indices               */
+   int     a;                    /* match state chracter (aa or nt)   */
+   int     KG   = hpm->abc->K+1; /* size of alphabet, plus gap char   */
+   int     M    = hpm->M;        /* number of match states            */
 
-   for (k = 1; k < hpm->M+1; k++) {
-      hsc +=  hpm->h[k][matseq[k]];
-      if (matseq[k] < hpm->abc->K) nmsc += log(hpm->ins[k][matseq[k]]);
 
-      for (l = k+1; l < hpm->M+1; l++) {
-         idx = IDX(matseq[k], matseq[l], hpm->abc->K+1);
-         esc += hpm->e[k][l][idx];
+   /* outer loop over match states */
+   for (k = 1; k <= M; k++) {
+
+      /* get character  in this match state */
+      a = matseq[k];
+      //a = *(matseq + k);
+
+      /* perform hoisting on e_{kl} array */
+      ek = hpm->e[k];
+
+      hsc +=  hpm->h[k][a];
+
+      if (a < KG-1 ) nmsc += hpm->lins[k][a];
+
+      /* inner loop over rightward match states */
+      for (l = k+1; l <= M; l++) {
+         /* get super index for this character combo */
+         idx = (a*KG) + matseq[l];
+         esc += ek[l][idx];
+
       }
-
    }
 
    *ret_hsc  = hsc;
@@ -605,3 +622,5 @@ int hpm_scoreops_ScoreMatchSeq(int *matseq, const HPM *hpm, float *ret_hsc, floa
    *ret_nmsc = nmsc;
    return eslOK;
 }
+
+
