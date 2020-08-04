@@ -256,13 +256,15 @@ hpmfile_Read(char *f, ESL_ALPHABET *abc, char *errbuf) {
             /* read insert emissions */
             else if (l == 1) {
                if (tok_count < abc->K) {
-                  ret_hpm->ins[i][tok_count] = exp(-atof(tok));
+                  ret_hpm->ins[i][tok_count]  = exp(-atof(tok));
+                  ret_hpm->lins[i][tok_count] = -atof(tok);
                }
             }
 
             /* read transition probs */
             if (l == 2 ) {
-               ret_hpm->t[i][tok_count] = exp(-atof(tok));
+               ret_hpm->t[i][tok_count]  = exp(-atof(tok));
+               ret_hpm->lt[i][tok_count] = -atof(tok);
             }
             prev_tok = tok;
             tok_count ++;
