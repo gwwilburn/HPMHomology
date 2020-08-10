@@ -585,20 +585,24 @@ int  hpm_scoreops_ScorePathTransitions(const H4_PATH *pi, const ESL_DSQ *dsq, co
 int hpm_scoreops_ScoreMatchSeq(int *matseq, const HPM *hpm, float *ret_hsc, float *ret_esc, float *ret_nmsc) {
    float   hsc  = 0.;            /* sum of h_k Potts terms            */
    float   esc  = 0.;            /* sum of e_{kl} Potts terms         */
+   //float   esc_ur  = 0.;            /* sum of e_{kl} Potts terms         */
    float   nmsc = 0.;            /* sum of null match emission scores */
    float **ek;                   /* ptr to hpm->e[k], for hoisting    */
    int     idx;                  /* Super-index for hpm->e[k][l]      */
    int     k,l;                  /* match state indices               */
    int     a;                    /* match state chracter (aa or nt)   */
    int     KG   = hpm->abc->K+1; /* size of alphabet, plus gap char   */
+   int     aKG;
    int     M    = hpm->M;        /* number of match states            */
 
 
    /* outer loop over match states */
    for (k = 1; k <= M; k++) {
+      //fprintf(stdout, "k: %d\n", k);
 
       /* get character  in this match state */
       a = matseq[k];
+      aKG = a *KG;
       //a = *(matseq + k);
 
       /* perform hoisting on e_{kl} array */
@@ -609,14 +613,38 @@ int hpm_scoreops_ScoreMatchSeq(int *matseq, const HPM *hpm, float *ret_hsc, floa
       if (a < KG-1 ) nmsc += hpm->lins[k][a];
 
       /* inner loop over rightward match states */
-      for (l = k+1; l <= M; l++) {
+      //for (l = k+1; l <= M; l++) {
          /* get super index for this character combo */
-         idx = (a*KG) + matseq[l];
+      //   idx = (aKG) + matseq[l];
+      //   esc += ek[l][idx];
+
+      //}
+
+      /* unrolled 1st inner loop over rightward match states */
+      for (l = k+1; l <= M-1; l += 2) {
+      //   fprintf(stdout, "\tk: %d, l: %d\n", k, l);
+         idx = (aKG) + matseq[l];
          esc += ek[l][idx];
 
+      //   fprintf(stdout, "\tk: %d, l: %d\n", k, l+1);
+         idx = (aKG) + matseq[l+1];
+         esc += ek[l+1][idx];
+
+      //   fprintf(stdout, "\tk: %d, l: %d\n", k, l+2);
+      //   idx = (aKG) + matseq[l+2];
+      //   esc += ek[l+2][idx];
+
+
+      }
+
+      for (; l <= M; l++){
+      //   fprintf(stdout, "\t\tk: %d, l: %d\n", k, l);
+         idx = (aKG) + matseq[l];
+         esc += ek[l][idx];
       }
    }
 
+   //fprintf(stdout, "esc: %.4f, esc_ur; %.4f\n", esc, esc_ur);
    *ret_hsc  = hsc;
    *ret_esc  = esc;
    *ret_nmsc = nmsc;
