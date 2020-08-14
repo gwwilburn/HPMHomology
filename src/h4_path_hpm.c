@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "easel.h"
 #include "esl_alphabet.h"
@@ -307,4 +308,33 @@ int h4_path_DumpAnnotated(FILE *fp, const H4_PATH *pi, const H4_PROFILE *hmm, co
 
    /* clean up and return */
    return eslOK;
+}
+
+
+int h4_path_GetCigar(const H4_PATH *pi, char *ret_cigar) {
+   char cigar[200];
+   char run[8];
+   int  z;
+
+   /* initialize strings to all null chars */
+   memset(cigar, 0, 200);
+   memset(run, 0, 8);
+
+   /* add first state run to cigar string */
+   sprintf(cigar, "%s%d ", h4_path_DecodeStatetype(pi->st[0]), pi->rle[0]);
+
+   /* add the other state runs to the cigar string */
+   for (z = 1; z < pi->Z; z++){
+      sprintf(run, "%s%d ", h4_path_DecodeStatetype(pi->st[z]), pi->rle[z]);
+      strcat(cigar, run);
+
+      /* reset run to null chars for next iteration */
+      memset(run, 0, 8);
+   }
+
+   //fprintf(stdout, "Cigar: %s\n", cigar);
+   strcpy(ret_cigar, cigar);
+
+   return eslOK;
+
 }

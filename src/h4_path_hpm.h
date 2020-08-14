@@ -20,6 +20,7 @@
 #include "h4_path.h"
 
 
-extern int h4_path_FromMSA(ESL_MSA *msa, int8_t *matassign, int optflags, H4_PATH **pi);
-extern int h4_path_DumpAnnotated(FILE *fp, const H4_PATH *pi, const H4_PROFILE *hmm, const H4_MODE *mo, const ESL_DSQ *dsq);
+extern int  h4_path_FromMSA(ESL_MSA *msa, int8_t *matassign, int optflags, H4_PATH **pi);
+extern int  h4_path_DumpAnnotated(FILE *fp, const H4_PATH *pi, const H4_PROFILE *hmm, const H4_MODE *mo, const ESL_DSQ *dsq);
+extern int  h4_path_GetCigar(const H4_PATH *pi, char *ret_cigar);
 #endif

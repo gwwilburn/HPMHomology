@@ -303,6 +303,7 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
    ESL_SQ        **out_sq      = NULL;                      /* traces used to construct output msa (-A)      */
    H4_PATH       **pi_dummy;                                /* dummy path array for sampled alignments       */
    H4_PATH       **out_pi      = NULL;                      /* paths used to construct output MSA            */
+   ESL_KEYHASH    *kh          = NULL;                      /* for hashing h4 paths                          */
    FILE           *scoreprogfp = NULL;                      /* score progress output file (--scoreprog)      */
    FILE           *aliprogfp   = NULL;                      /* alignment progress output file (--aliprog)    */
    int             i,j;                                     /* sequence indices                              */
@@ -310,6 +311,10 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
    int             r,s;                                     /* alignment sample indices                      */
    int             N_batch;                                 /* total number of batches                       */
    int             nBetter;                                 /* number of better alignments we've found       */
+   int             idx;
+   int             idx_max = -1;
+   int             nkey;
+   char            cigar[200];
    float           fsc;                                     /* forward partial log-odds score, in bits       */
    float           hmmsc_ld;                                /* hmm log odds S(x,pi), in bits                 */
    float           hpmsc_ld;                                /* hpm unnormalized log odds S*(x, pi), in bits  */
@@ -317,9 +322,15 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
    float           ldprev;                                  /* previous IS log-odds score                    */
    double          ld;                                      /* importance sampling log odds score S*(x)      */
    double          ls;                                      /* log of importance sampling sum                */
+   double          ls_hash;                                      /* log of importance sampling sum                */
    double         *pr, *pr_unsorted;                        /* terms in importance sampling sum              */
+   double         *pr_hash;
+   double         *hash_scores;
    int             status;                                  /* easel return code                             */
    //char            errbuf[eslERRBUFSIZE];                   /* buffer for easel errors                       */
+
+   /* initalize cigar string to all null chars */
+   memset(cigar, 0, 200);
 
    /* if score progress file is requested, open it */
    if (scoreprogfile) {
@@ -339,6 +350,7 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       ESL_ALLOC(out_sq, sizeof(ESL_SQ *) * (totseq));
    }
 
+
    /* calculate number of batches */
    N_batch = (R / R_batch) + (R % R_batch != 0);
    fprintf(stdout, "N_batch: %d\n", N_batch);
@@ -354,8 +366,26 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
    /* allocate array to store terms in importance sampling sum */
    ESL_ALLOC(pr, R*sizeof(double));
    ESL_ALLOC(pr_unsorted, R*sizeof(double));
+   ESL_ALLOC(pr_hash, R*sizeof(double));
    esl_vec_DSet(pr, R, 0.0);
    esl_vec_DSet(pr_unsorted, R, 0.0);
+   esl_vec_DSet(pr_hash, R, 0.0);
+
+   /* calculate number of keys to allocate for (next highest power of 2 from R) */
+   //nkey = (int) pow(2.0, ceil(log2(R)));
+   nkey = 1024;
+   //nkey =  (int) pow(2.0, 10.0);
+   //if (nkey > 1024) nkey = 1024;
+   //if (nkey >  1048576) nkey = 1048576;
+
+   /* create keyhash object */
+   //kh = esl_keyhash_CreateCustom(nkey, nkey, 512);
+   kh = esl_keyhash_Create();
+   //fprintf(stdout, "number of allocated keys: %d\n", kh->kalloc);
+
+   /* allocate table for hashed path scores */
+   ESL_ALLOC(hash_scores, nkey*sizeof(double));
+   esl_vec_DSet(hash_scores, nkey, 0.0);
 
    /* set HMM mode to uniglocal  */
    h4_mode_SetUniglocal(mo);
@@ -384,6 +414,7 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       /* prep for sampling paths */
       esl_vec_DSet(pr, R, 0.0);
       esl_vec_DSet(pr_unsorted, R, 0.0);
+      esl_vec_DSet(pr_hash, R, 0.0);
 
       /* middle loop over batches of sampled alignments */
       for (b = 0; b < N_batch; b++) {
@@ -402,16 +433,67 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
             /* get stochastic traceback */
             h4_reference_StochasticTrace(rng, NULL, hmm, mo, fwd, pi_dummy[s]);
 
-            //h4_profile_Dump(stdout, hmm);
+            /* HASH PATH HERE */
+            //h4_path_DumpCigar(stdout, pi_dummy[s]);
+            /* make path cigar */
+            h4_path_GetCigar(pi_dummy[s], cigar);
+
+            /* DEBUG: print out all chars in the cigar string */
+            /*
+            for (int m = 0; m < 200; m++) {
+               fprintf(stdout, "i: %d, cigar[i]: %d\n", m, cigar[m]);
+            }
+            */
+
+            /* check and see if this path cigar is in hash table */
+            esl_keyhash_Lookup(kh, cigar, pi_dummy[s]->Z*4, &idx);
+            //fprintf(stdout, "\tidx: %d\n", idx);
+
+            /* path is not in hash table */
+            if (idx == -1) {
+
+               //fprintf(stdout, "New path! Goint to hash it!\n");
+               if (idx_max < nkey-1) {
+                  esl_keyhash_Store(kh, cigar, pi_dummy[s]->Z*4, &idx);
+                  //fprintf(stdout, "\tpath assigned idx %d\n\n\n", idx);
+                  idx_max = idx;
+               }
+
+               /* score path under HMM */
+               h4_path_Score(pi_dummy[s], sq[i]->dsq, hmm, mo, &hmmsc_ld);
+               pr[r] -= (hmmsc_ld / eslCONST_LOG2R);
+
+               /* score path under HPM */
+               hpm_scoreops_ScorePath(pi_dummy[s], sq[i]->dsq, hpm, mo, &hpmsc_ld, NULL, NULL, NULL, NULL);
+               pr[r] += hpmsc_ld;
+
+               if (idx < nkey && idx > -1) hash_scores[idx] = pr_hash[r];
+
+
+            }
+
+            /* path is in hash table */
+            else{
+               //fprintf(stdout, "path already seen.\n\n\n");
+               pr[r] = hash_scores[idx];
+            }
+
+            /* reset cigar to all null chars */
+            memset(&cigar[0], 0, 200);
 
             /* score path under HMM */
+            /* pre-hash scoring code */
+            /*
             h4_path_Score(pi_dummy[s], sq[i]->dsq, hmm, mo, &hmmsc_ld);
             pr[r] -= (hmmsc_ld / eslCONST_LOG2R);
+            */
 
             /* score path under HPM */
+            /*
             hpm_scoreops_ScorePath(pi_dummy[s], sq[i]->dsq, hpm, mo, &hpmsc_ld, NULL, NULL, NULL, NULL);
             pr[r] += hpmsc_ld;
-
+            //fprintf(stdout, "\tpr[r]: %.4f, pr_hash[r]: %.4f, idx: %d\n", pr[r], pr_hash[r], idx);
+            */
             /* for output alignment , see if we've got a better path */
             if (A && hpmsc_ld > hpmsc_max) {
                hpmsc_max = hpmsc_ld;
@@ -426,6 +508,7 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
             }
 
          }
+
 
          /* handle this batch of path scores */
          /* if requested, track intermediate scoring progress for this batch */
@@ -456,11 +539,16 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       }
       /* calculate IS approximation for this sequence */
       /* sort to increase accuracy if LogSum */
+      //if (esl_vec_DCompare(pr, pr_hash, R, 0.01) != eslOK) fprintf(stdout, "VECTORS ARE DIFFERENT\n");
       esl_vec_DSortIncreasing(pr, R);
+      esl_vec_DSortIncreasing(pr_hash, R);
 
       /* run log sum */
       ls = esl_vec_DLog2Sum(pr, R);
       ld = (fsc / eslCONST_LOG2R) - logf(R) + ls;
+
+      //ls_hash = esl_vec_DLog2Sum(pr_hash, R);
+      //fprintf(stdout, "ls: %.4f, ls_hash: %.4f, idx_max: %d\n", ls, ls_hash, idx_max);
 
       /* add scoring info to scoreset object */
       hpm_is_ss->sqname[j] = sq[i]->name;
@@ -468,6 +556,12 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       hpm_is_ss->H[j]      = -1.0;
       hpm_is_ss->fwd[j]    = (fsc - mo->nullsc) / eslCONST_LOG2R;
       hpm_is_ss->is_ld[j]   = ld;
+
+      /* reset hash table and array of hashed scores */
+      esl_keyhash_Dump(stdout, kh);
+      esl_keyhash_Reuse(kh);
+      esl_vec_DSet(hash_scores, nkey, 0.0);
+      idx_max = 0;
 
    }
 
@@ -491,10 +585,13 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
       esl_sq_Destroy(sq_dummy[s]);
       h4_path_Destroy(pi_dummy[s]);
    }
+   esl_keyhash_Destroy(kh);
    free(sq_dummy);
    free(pi_dummy);
    free(pr);
    free(pr_unsorted);
+   free(pr_hash);
+   free(hash_scores);
    h4_refmx_Destroy(fwd);
    h4_mode_Destroy(mo);
    return eslOK;
