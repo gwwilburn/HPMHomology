@@ -124,6 +124,9 @@ int main(int argc, char **argv) {
                                             status, sqfp->filename);
    totseq = nseq;
 
+   /* initiate logsum magic */
+   p7_FLogsumInit();
+
    /* Configure a profile from the HMM */
    bg = p7_bg_Create(abc);
    gm = p7_profile_Create(hmm->M, abc);
