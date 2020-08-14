@@ -69,6 +69,8 @@ int main(int argc, char **argv) {
    int             format    = eslSQFILE_UNKNOWN;         /* input seq file format          */
    int             status;                                /* esl return code                */
 
+
+
    /* parse command line */
    go = esl_getopts_Create(options);
    if (esl_opt_ProcessCmdline(go, argc, argv) != eslOK) cmdline_failure(argv[0], "Failed to parse command line: %s\n", go->errbuf);
@@ -123,6 +125,9 @@ int main(int argc, char **argv) {
    else if (status != eslEOF)     esl_fatal("Unexpected error %d reading sequence file %s",
                                             status, sqfp->filename);
    totseq = nseq;
+
+   /* initiate logsum magic */
+   p7_FLogsumInit();
 
    /* Configure a profile from the HMM */
    bg = p7_bg_Create(abc);
