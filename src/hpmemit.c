@@ -27,7 +27,7 @@ static ESL_OPTIONS options[] = {
 
    /* options controlling sequence emission */
    { "-N",       eslARG_INT,     "1",    NULL, "n>0", NULL, NULL, NULL,            "number of seqs to sample",                                                           1 },
-   { "-L",       eslARG_INT,     "100",  NULL, "n>0", NULL, NULL, NULL,            "set expected length from profile to <l> (for N and C state transition probs)",       1 },
+   { "-L",       eslARG_INT,     "100",  NULL, "n>0", NULL, NULL, NULL,            "set expected length from profile to <l> (for N and C states)",       1 },
    { "--Niter",  eslARG_INT,     "1000", NULL, "n>0", NULL, NULL, NULL,            "number of MCMC iterations per sequence",                                             1 },
 
    /* Options forcing which alphabet we're working in (normally autodetected) */
@@ -37,7 +37,7 @@ static ESL_OPTIONS options[] = {
 
    /* debugging tools */
    { "-v",       eslARG_NONE,    FALSE,  NULL, NULL,  NULL, NULL, NULL,            "Verbose mode: print info on intermediate emission steps",                            3 },
-   { "--burnin", eslARG_OUTFILE, FALSE,  NULL, NULL,  NULL, NULL, NULL,            "(TBD) send csv of Potts hamiltonian vs MCMC iteration (first sequence only) to <f>", 3 },
+   { "--burnin", eslARG_OUTFILE, FALSE,  NULL, NULL,  NULL, NULL, NULL,            "send csv of Potts hamiltonian vs MCMC iteration <f>",                                3 },
    { 0,0,0,0,0,0,0,0,0,0 },
 };
 
@@ -45,8 +45,8 @@ static char usage[]   = "[-options] <hpmfile> <msaoutfile>";
 static char banner[]  = "sample aligned sequence(s) from an HPM";
 
 /* declaration of internal functions */
-static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *rng, HPM *hpm, int v);
-int         emit_match_MCMC(ESL_SQ *msq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int v);
+static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *rng, HPM *hpm,  FILE *burninfp, int v);
+int         emit_match_MCMC(ESL_SQ *msq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int seqid, FILE *burninf, int v);
 int         sample_trace(int L, P7_TRACE *tr, ESL_SQ *msq, HPM *hpm,  ESL_RANDOMNESS *rng, int v);
 int         emit_inserts(P7_TRACE *tr, ESL_SQ *sq, ESL_SQ *msq, HPM *hpm,  ESL_RANDOMNESS *rng, int v);
 
@@ -63,15 +63,17 @@ cmdline_failure(char *argv0, char *format, ...)
 }
 
 int main(int argc, char *argv[]) {
-   ESL_GETOPTS    *go;                                            /* cmd line configuration  */
-   ESL_ALPHABET   *abc                    = NULL;                 /* sequence alphabet       */
-   ESL_RANDOMNESS *rng                    = NULL;                 /* random number generator */
-   char           *hpmfile                = NULL;                 /* input HPM filepath      */
-   HPM            *hpm                    = NULL;                 /* input HPM               */
-   int             outfmt                 = eslMSAFILE_STOCKHOLM; /* output MSA format       */
-   FILE           *ofp                    = NULL;                 /* output MSA filestream   */
-   int             v                      = 0;                    /* verbose mode indicator  */
-   char            errbuf[eslERRBUFSIZE];                         /* for error messages      */
+   ESL_GETOPTS    *go;                                            /* cmd line configuration                     */
+   ESL_ALPHABET   *abc                    = NULL;                 /* sequence alphabet                          */
+   ESL_RANDOMNESS *rng                    = NULL;                 /* random number generator                    */
+   char           *hpmfile                = NULL;                 /* input HPM filepath                         */
+   HPM            *hpm                    = NULL;                 /* input HPM                                  */
+   int             outfmt                 = eslMSAFILE_STOCKHOLM; /* output MSA format                          */
+   FILE           *ofp                    = NULL;                 /* output MSA filestream                      */
+   char           *burninfile             = NULL;                 /* Output MCMC progess filepath (--burnin)    */
+   FILE           *burninfp               = NULL;                 /* output MCMC progress filestream (--burnin) */
+   int             v                      = 0;                    /* verbose mode indicator                     */
+   char            errbuf[eslERRBUFSIZE];                         /* for error messages                         */
 
    /* parse command line */
    go = esl_getopts_Create(options);
@@ -106,6 +108,15 @@ int main(int argc, char *argv[]) {
    /* check for verbose mode */
    if (esl_opt_GetBoolean(go, "-v")) v = 1;
 
+   /* check for burn-in option */
+    if (esl_opt_IsOn(go, "--burnin")) {
+      burninfile = (esl_opt_GetString(go, "--burnin"));
+      if ((burninfp = fopen(burninfile, "w")) == NULL) esl_fatal("Failed to open file %s for writing\n", burninfile);
+
+      /* write csv header */
+      fprintf(burninfp, "seq_id,mcmc_iter,E\n");
+    }
+
    /* create random number generator */
    rng = esl_randomness_Create(esl_opt_GetInteger(go, "-s"));
 
@@ -113,10 +124,11 @@ int main(int argc, char *argv[]) {
    hpm = hpmfile_Read(hpmfile, abc, errbuf);
 
    /* emit an alignment! */
-   emit_alignment(go, ofp, outfmt, rng, hpm, v);
+   emit_alignment(go, ofp, outfmt, rng, hpm, burninfp, v);
 
    /* clean up and return */
    fclose(ofp);
+   if (burninfp) fclose(burninfp);
    hpm_Destroy(hpm);
    esl_randomness_Destroy(rng);
    esl_alphabet_Destroy(abc);
@@ -125,7 +137,7 @@ int main(int argc, char *argv[]) {
 }
 
 
-static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *rng, HPM *hpm, int v)
+static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNESS *rng, HPM *hpm, FILE *burninfp, int v)
 {
    ESL_MSA   *msa       = NULL;                              /* emitted MSA                   */
    ESL_SQ   **sq        = NULL;                              /* emitted seq array             */
@@ -139,8 +151,6 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 
    if (v) fprintf(stdout, "in emit_alignment()\n");
 
-   /* open burn-in file */
-   /* TO BE ADDED */
 
    /* allocate space for trace and seq arrays */
    if ((tr = malloc(sizeof(P7_TRACE *) * N)) == NULL) esl_fatal("failed to allocate trace array");
@@ -158,7 +168,7 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 
       /* PASS BURN-IN FILE */
       /* emit match states from Potts prob dist via MCMC */
-      emit_match_MCMC(msq, hpm, Niter, rng, v);
+      emit_match_MCMC(msq, hpm, Niter, rng, i, burninfp ,v);
 
       /* generate trace */
       /* pass match sequence to this function */
@@ -181,8 +191,6 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
       esl_sq_Reuse(msq);
    }
 
-   /* write burn-in file */
-   /* TO BE ADDED */
 
    /* Write MSA to outfile */
    p7_tracealign_Seqs(sq, tr, N, hpm->M, optflags, NULL, &msa);
@@ -201,7 +209,7 @@ static void emit_alignment(ESL_GETOPTS *go, FILE *ofp, int outfmt, ESL_RANDOMNES
 
 /* modify to accept burn-in file */
 
-int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int v)
+int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int seqid, FILE *burninfp, int v)
 {
    int       k;         /* node index                          */
    int       i;         /* sequence index                      */
@@ -303,10 +311,10 @@ int emit_match_MCMC(ESL_SQ *sq, HPM *hpm, int Niter, ESL_RANDOMNESS *rng, int v)
          }
       }
 
-      //if (n % 100 == 0) {
-      // hpm_scoreops_CalculateHamiltonian(hpm, tr, sq->dsq, &hsc, &esc);
-      // fprintf(stdout, "%d,%.4f\n", n, hsc + esc);
-      //}
+      if (n % 10 == 0 && burninfp) {
+         hpm_scoreops_CalculateHamiltonian(hpm, tr, sq->dsq, &hsc, &esc);
+         fprintf(burninfp, "%d,%d,%.2f\n", seqid, n, hsc + esc);
+      }
 
       esl_sq_Reuse(sq_tmp);
    }
