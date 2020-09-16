@@ -438,7 +438,7 @@ int Calculate_IS_scores(HPM *hpm, H4_PROFILE *hmm, ESL_SQ **sq, ESL_RANDOMNESS *
             ld = (fsc / eslCONST_LOG2R) - logf(r+1) + ls;
 
             /* record to scoreprog file */
-            fprintf(stdout, "r: %d, intermediate score: %2f\n", r, ld);
+            //fprintf(stdout, "r: %d, intermediate score: %2f\n", r, ld);
             fprintf(scoreprogfp, "%s,%d,%.2f\n", sq[i]->name, r, ld);
 
             /* if we have a jump, track it down if requested by caller */
