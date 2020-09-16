@@ -127,6 +127,9 @@ main(int argc, char **argv)
       tr[i] = p7_trace_Create();
    }
 
+   /* initiate logsum magic */
+   p7_FLogsumInit();
+
    /* Configure a profile from the HMM */
    bg = p7_bg_Create(abc);
    gm = p7_profile_Create(hmm->M, abc);
